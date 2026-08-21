@@ -3,8 +3,10 @@ Keyframe OCR Processor (M3 Module)
 Extracts on-screen code snippets, diagrams labels, slide text, and subtitle overlays.
 """
 
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
 from pydantic import BaseModel
+
 
 class OCRBoundingBox(BaseModel):
     text: str

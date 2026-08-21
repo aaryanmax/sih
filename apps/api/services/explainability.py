@@ -83,7 +83,7 @@ class ExplainabilityService:
       * Network / quota errors
     """
 
-    # Gemini model — configured via GEMINI_MODEL or defaults to gemini-3.5-flash-lite
+    # Gemini model — use gemini-3.5-flash-lite per project configuration
     DEFAULT_MODEL = "gemini-3.5-flash-lite"
 
     def __init__(self, timeout_s: float = 1.5) -> None:

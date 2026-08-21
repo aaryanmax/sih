@@ -3,9 +3,11 @@ Qdrant Multi-Vector Store Integration for Video Frames (M2 Module)
 """
 
 import os
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
+
 
 class VideoVectorStore:
     def __init__(self, host: Optional[str] = None, port: Optional[int] = None):

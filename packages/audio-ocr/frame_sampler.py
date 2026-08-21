@@ -5,7 +5,9 @@ Extracts keyframes from video files based on scene transitions and time interval
 
 import os
 from typing import List, Tuple
+
 from pydantic import BaseModel
+
 
 class KeyframeMeta(BaseModel):
     frame_index: int

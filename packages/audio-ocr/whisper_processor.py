@@ -3,8 +3,10 @@ Whisper Speech-to-Text Processor (M3 Module)
 Extracts spoken audio transcripts with word-level and sentence-level timestamps.
 """
 
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel
+
 
 class AudioSegment(BaseModel):
     start_s: float

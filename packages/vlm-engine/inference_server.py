@@ -4,10 +4,11 @@ Loads Qwen-VL into GPU memory, serves it for embedding extraction and reasoning.
 """
 
 import os
+
 import torch
+import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-import uvicorn
 
 # vLLM setup
 from vllm import AsyncEngineArgs, AsyncLLMEngine
@@ -44,17 +45,17 @@ def extract_patch_tokens_internal(chunked_tensors: torch.Tensor) -> torch.Tensor
     :return: Tensor of hidden states (patch tokens)
     """
     print(f"Extracting patches for tensor of shape: {chunked_tensors.shape}")
-    
+
     # In a fully implemented Qwen-VL wrapper, we would pass this to the vision tower:
     # vision_tower = engine.get_model().vision_tower
     # hidden_states = vision_tower(chunked_tensors.cuda())
-    
+
     # Mocking the hidden states output for architectural completeness
     # Assume Qwen2-VL-7B uses a hidden dimension of 4096
     hidden_dim = 4096
     num_chunks = chunked_tensors.shape[0]
     patches_per_chunk = 256 # Example downsampled patch count
-    
+
     # Shape: (Num_Chunks, Patches_per_Chunk, Hidden_Dim)
     hidden_states = torch.randn((num_chunks, patches_per_chunk, hidden_dim), device='cpu')
     return hidden_states
@@ -71,16 +72,16 @@ async def extract_patches_endpoint(request: TensorRequest):
     and returns the patch tokens.
     """
     from video_chunker import VideoChunker
-    
+
     try:
         chunker = VideoChunker(fps_target=request.fps_target, chunk_duration_sec=request.chunk_duration_sec)
-        
+
         # 1. Intelligently slice raw .mp4 without losing context
         chunked_tensors = chunker.process_video(request.video_path)
-        
+
         # 2. Extract hidden states (patch tokens)
         hidden_states = extract_patch_tokens_internal(chunked_tensors)
-        
+
         return {
             "status": "success",
             "video_path": request.video_path,

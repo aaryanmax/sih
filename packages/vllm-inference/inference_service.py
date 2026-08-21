@@ -3,9 +3,10 @@ vLLM Inference Service for Qwen-VL (M1 Module)
 Provides accelerated multi-modal reasoning and captioning over video keyframes.
 """
 
-import os
 import logging
-from typing import List, Optional, Dict, Any
+import os
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
 logging.basicConfig(level=logging.INFO)
@@ -40,7 +41,7 @@ class QwenVLInferenceEngine:
         """
         # Formulate multimodal messages
         content_payload: List[Dict[str, Any]] = [{"type": "text", "text": request.query}]
-        
+
         for img in request.image_urls:
             content_payload.append({
                 "type": "image_url",
@@ -48,7 +49,7 @@ class QwenVLInferenceEngine:
             })
 
         logger.info(f"Executing Qwen2-VL inference for query: '{request.query}' with {len(request.image_urls)} frame(s)")
-        
+
         # Mock / fallback or direct invocation template
         return FrameQueryResponse(
             answer=f"Identified visual context corresponding to query '{request.query}' at {request.video_timestamp_s or 0.0:.2f}s.",

@@ -36,10 +36,10 @@ try:
     from qdrant_client import QdrantClient
     from qdrant_client.models import (
         Distance,
-        MultiVectorConfig,
         MultiVectorComparator,
-        VectorParams,
+        MultiVectorConfig,
         PointStruct,
+        VectorParams,
     )
 except ImportError:
     sys.exit(

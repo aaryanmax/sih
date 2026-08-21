@@ -4,10 +4,9 @@ SIH Advanced Video Search Platform
 """
 
 import os
-from fastapi import FastAPI, UploadFile, File, Form, Query
-from fastapi.middleware.cors import CORSMiddleware
-import os
 
+from fastapi import FastAPI, File, Form, Query, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from routes.search import router as search_router
 
 app = FastAPI(

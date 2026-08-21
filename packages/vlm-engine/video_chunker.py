@@ -4,8 +4,9 @@ Reads raw .mp4 files and intelligently slices them into processable chunks.
 """
 
 import os
-import torch
+
 import decord
+import torch
 from decord import VideoReader, cpu
 
 # Configure decord to output PyTorch tensors natively for zero-copy speed
@@ -34,14 +35,14 @@ class VideoChunker:
         vr = VideoReader(video_path, ctx=cpu(0))
         native_fps = vr.get_avg_fps()
         total_frames = len(vr)
-        
+
         if native_fps == 0 or total_frames == 0:
             raise ValueError("Invalid video file or no frames found.")
 
         # Calculate frame indices for target FPS
         frame_interval = native_fps / self.fps_target
         target_frame_indices = [int(i * frame_interval) for i in range(int(total_frames / frame_interval))]
-        
+
         # Ensure we don't exceed actual frame count
         target_frame_indices = [idx for idx in target_frame_indices if idx < total_frames]
 
@@ -53,15 +54,15 @@ class VideoChunker:
 
         # Group into chunks: (Num_Chunks, Frames_per_Chunk, C, H, W)
         num_complete_chunks = len(frames) // self.frames_per_chunk
-        
+
         if num_complete_chunks > 0:
             # Truncate trailing frames that don't make a full chunk for simplicity
             chunked_tensors = frames[:num_complete_chunks * self.frames_per_chunk]
             chunked_tensors = chunked_tensors.view(
-                num_complete_chunks, 
-                self.frames_per_chunk, 
-                frames.shape[1], 
-                frames.shape[2], 
+                num_complete_chunks,
+                self.frames_per_chunk,
+                frames.shape[1],
+                frames.shape[2],
                 frames.shape[3]
             )
         else:

@@ -3,9 +3,11 @@ Patch Encoder for Late-Interaction Embeddings
 Extracts token-level representations (multi-vectors) from VLM hidden states.
 """
 
-import torch
-import numpy as np
 from typing import List, Optional
+
+import numpy as np
+import torch
+
 
 class PatchEncoder:
     def __init__(self, projection_dim: int = 128):
@@ -28,21 +30,21 @@ class PatchEncoder:
                  Each is of shape (Num_Patches, Projection_Dim).
         """
         batch_size, seq_len, hidden_dim = hidden_states.shape
-        
-        # A real implementation applies a learned linear projection here to reduce 
+
+        # A real implementation applies a learned linear projection here to reduce
         # the hidden_dim (e.g., 4096) down to the projection_dim (e.g., 128) for efficient Qdrant storage.
         # Here we apply a simulated orthogonal projection for demonstration.
-        
+
         # Simulated projection layer (in a real scenario, you load trained weights from ColPali)
         projection_weights = torch.randn((hidden_dim, self.projection_dim), device=hidden_states.device)
         projection_weights = projection_weights / torch.norm(projection_weights, dim=0, keepdim=True)
-        
+
         # Project hidden states to embedding space: (Batch, Seq_Len, 128)
         projected_states = torch.matmul(hidden_states, projection_weights)
-        
+
         # L2 normalize the projected states along the embedding dimension
         projected_states = torch.nn.functional.normalize(projected_states, p=2, dim=-1)
-        
+
         multi_vectors = []
         for i in range(batch_size):
             if patch_mask is not None:
@@ -51,10 +53,10 @@ class PatchEncoder:
             else:
                 # Assume all tokens are visual patches if no mask provided
                 patches = projected_states[i]
-                
+
             # Convert to numpy for downstream Qdrant insertion
             multi_vectors.append(patches.detach().cpu().numpy())
-            
+
         return multi_vectors
 
 if __name__ == "__main__":

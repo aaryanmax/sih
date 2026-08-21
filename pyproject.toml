@@ -1,0 +1,18 @@
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = [
+    "E402",  # module level import not at top of file (sys.path manipulation for local packages)
+    "E501",  # line too long (handled by black)
+    "F401",  # unused imports in stubs / init
+    "F841",  # local variable unused in stubs
+    "W291",  # trailing whitespace
+    "W293",  # blank line contains whitespace
+]
+
+[tool.black]
+line-length = 120
+target-version = ['py311']

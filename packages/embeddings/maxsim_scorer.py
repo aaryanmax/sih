@@ -4,18 +4,20 @@ Handles schema initialization for multivector payloads in Qdrant and executes Ma
 """
 
 import os
+from typing import Any, Dict, List
+
 import numpy as np
-from typing import List, Dict, Any
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
+
 
 class MaxSimRetriever:
     def __init__(self, collection_name: str = "sih_video_keyframes"):
         self.collection_name = collection_name
-        
+
         qdrant_host = os.getenv("QDRANT_HOST", "localhost")
         qdrant_port = int(os.getenv("QDRANT_PORT", "6333"))
-        
+
         try:
             self.client = QdrantClient(host=qdrant_host, port=qdrant_port)
             print(f"MaxSimRetriever connected to Qdrant at {qdrant_host}:{qdrant_port}")
@@ -34,7 +36,7 @@ class MaxSimRetriever:
 
         collections = self.client.get_collections().collections
         exists = any(c.name == self.collection_name for c in collections)
-        
+
         if not exists:
             print(f"Creating Qdrant collection '{self.collection_name}' with MultiVectorConfig(MAX_SIM)...")
             self.client.create_collection(

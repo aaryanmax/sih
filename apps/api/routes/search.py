@@ -34,9 +34,9 @@ _project_root = os.path.abspath(os.path.join(_current_dir, "..", "..", ".."))
 sys.path.insert(0, os.path.join(_project_root, "packages"))
 sys.path.insert(0, os.path.join(_project_root, "apps", "api"))
 
-from embeddings.query_encoder import encode_query           # type: ignore
+from embeddings.query_encoder import encode_query  # type: ignore
 from retrieval.late_interaction import LateInteractionRetriever  # type: ignore
-from services.explainability import ExplainabilityService   # type: ignore
+from services.explainability import ExplainabilityService  # type: ignore
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

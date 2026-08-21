@@ -4,7 +4,9 @@ ColPali Multi-Vector Embedder for Video Frames & Text Queries (M2 Module)
 
 import os
 from typing import List, Union
+
 import numpy as np
+
 
 class ColPaliEmbedder:
     """
