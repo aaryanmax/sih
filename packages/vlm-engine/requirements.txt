@@ -1,0 +1,7 @@
+vllm>=0.6.3
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.8.0
+decord>=0.6.0
+ffmpeg-python>=0.2.0
+numpy>=1.26.0

@@ -1,0 +1,94 @@
+services:
+  # -------------------------------------------------------------
+  # Vector Database: Qdrant for Multi-Vector ColPali Storage
+  # -------------------------------------------------------------
+  qdrant:
+    image: qdrant/qdrant:v1.12.1
+    container_name: sih_qdrant_storage
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_storage:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+      - QDRANT__STORAGE__PERFORMANCE__MAX_SEARCH_THREADS=8
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/6333'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # -------------------------------------------------------------
+  # M1: vLM Engine for Qwen-VL Multimodal Analysis
+  # -------------------------------------------------------------
+  vlm-engine:
+    build:
+      context: ./packages/vlm-engine
+      dockerfile: Dockerfile
+    container_name: sih_vlm_engine
+    ports:
+      - "8001:8001"
+    environment:
+      - MODEL_NAME=Qwen/Qwen2-VL-7B-Instruct
+      - TENSOR_PARALLEL_SIZE=1
+      - GPU_MEMORY_UTILIZATION=0.85
+      - MAX_MODEL_LEN=4096
+      - PORT=8001
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  # -------------------------------------------------------------
+  # M4: FastAPI Central Backend & Search Orchestration
+  # -------------------------------------------------------------
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: sih_fastapi_backend
+    ports:
+      - "8000:8000"
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    environment:
+      - ENVIRONMENT=production
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - VLM_HOST=http://vlm-engine:8001
+      - WHISPER_MODEL_SIZE=base
+      - OCR_ENGINE=paddleocr
+      - STORAGE_DIR=/app/storage
+    volumes:
+      - api_video_storage:/app/storage
+    restart: unless-stopped
+
+  # -------------------------------------------------------------
+  # M5: Next.js Interactive Web Interface
+  # -------------------------------------------------------------
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: sih_nextjs_frontend
+    ports:
+      - "3001:3000"
+    depends_on:
+      - api
+    environment:
+      - NEXT_PUBLIC_API_URL=http://api:8000
+      - NODE_ENV=production
+    restart: unless-stopped
+
+volumes:
+  qdrant_storage:
+    driver: local
+  api_video_storage:
+    driver: local

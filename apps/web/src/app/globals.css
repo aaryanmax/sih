@@ -1,0 +1,240 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Design Tokens ─────────────────────────────────────────────────────── */
+:root {
+  --font-inter: "Inter", sans-serif;
+
+  /* Palette */
+  --void:         #03030a;
+  --surface-0:    #0a0a14;
+  --surface-1:    #10101e;
+  --surface-2:    #16162a;
+  --border:       #1e1e36;
+  --border-glow:  #6366f1;
+
+  /* Accent */
+  --indigo-400:   #818cf8;
+  --indigo-500:   #6366f1;
+  --indigo-600:   #4f46e5;
+  --violet-500:   #8b5cf6;
+  --emerald-400:  #34d399;
+  --amber-400:    #fbbf24;
+  --rose-400:     #fb7185;
+
+  /* Text */
+  --text-primary:   #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted:     #475569;
+}
+
+/* ─── Base Reset ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background-color: var(--void);
+  font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Custom Tailwind Colours ────────────────────────────────────────────── */
+@layer base {
+  .bg-void     { background-color: var(--void); }
+  .bg-surface-0 { background-color: var(--surface-0); }
+  .bg-surface-1 { background-color: var(--surface-1); }
+  .bg-surface-2 { background-color: var(--surface-2); }
+}
+
+/* ─── Animated gradient orbs (background ambience) ──────────────────────── */
+.bg-orbs {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.bg-orbs::before,
+.bg-orbs::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.07;
+  animation: orbFloat 18s ease-in-out infinite alternate;
+}
+
+.bg-orbs::before {
+  width: 900px;
+  height: 900px;
+  background: radial-gradient(circle, #6366f1 0%, transparent 70%);
+  top: -200px;
+  left: -200px;
+  animation-delay: 0s;
+}
+
+.bg-orbs::after {
+  width: 700px;
+  height: 700px;
+  background: radial-gradient(circle, #8b5cf6 0%, transparent 70%);
+  bottom: -150px;
+  right: -150px;
+  animation-delay: -9s;
+}
+
+@keyframes orbFloat {
+  0%   { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(60px, 40px) scale(1.05); }
+  100% { transform: translate(-40px, 60px) scale(0.97); }
+}
+
+/* ─── Glassmorphism card ─────────────────────────────────────────────────── */
+.glass {
+  background: rgba(16, 16, 30, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+}
+
+.glass-hover {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.glass-hover:hover {
+  border-color: rgba(99, 102, 241, 0.35);
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.15), 0 8px 40px rgba(99, 102, 241, 0.08);
+  background: rgba(20, 20, 40, 0.75);
+}
+
+.glass-active {
+  border-color: var(--border-glow) !important;
+  box-shadow:
+    0 0 0 1px rgba(99, 102, 241, 0.4),
+    0 0 24px rgba(99, 102, 241, 0.12),
+    inset 0 0 30px rgba(99, 102, 241, 0.04) !important;
+  background: rgba(20, 20, 48, 0.8) !important;
+}
+
+/* ─── Search input ───────────────────────────────────────────────────────── */
+.search-input {
+  background: rgba(10, 10, 22, 0.8);
+  border: 1px solid var(--border);
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--indigo-500);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15), 0 1px 40px rgba(99, 102, 241, 0.1);
+}
+
+/* ─── Score bar ──────────────────────────────────────────────────────────── */
+.score-bar-track {
+  height: 3px;
+  background: var(--surface-2);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.score-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--indigo-500), var(--violet-500));
+  border-radius: 99px;
+  transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ─── Typewriter cursor ──────────────────────────────────────────────────── */
+.typewriter::after {
+  content: "▋";
+  display: inline-block;
+  animation: blink 0.9s step-end infinite;
+  color: var(--indigo-400);
+  margin-left: 2px;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+/* ─── Loading shimmer ────────────────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.03) 25%,
+    rgba(255,255,255,0.07) 50%,
+    rgba(255,255,255,0.03) 75%
+  );
+  background-size: 800px 100%;
+  animation: shimmer 1.6s infinite linear;
+}
+
+/* ─── Pulse ring (searching animation) ──────────────────────────────────── */
+@keyframes pulseRing {
+  0%   { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
+  70%  { transform: scale(1);    box-shadow: 0 0 0 10px rgba(99, 102, 241, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);   }
+}
+
+.pulse-ring { animation: pulseRing 1.5s ease infinite; }
+
+/* ─── Fade-in-up entrance ────────────────────────────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in-up {
+  animation: fadeInUp 0.4s ease forwards;
+}
+
+/* ─── Video player ───────────────────────────────────────────────────────── */
+video {
+  display: block;
+  border-radius: 8px;
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--surface-0); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #2a2a48; }
+
+/* ─── Badge ──────────────────────────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.badge-indigo {
+  background: rgba(99, 102, 241, 0.15);
+  color: var(--indigo-400);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+}
+
+.badge-emerald {
+  background: rgba(52, 211, 153, 0.1);
+  color: var(--emerald-400);
+  border: 1px solid rgba(52, 211, 153, 0.2);
+}
+
+.badge-amber {
+  background: rgba(251, 191, 36, 0.1);
+  color: var(--amber-400);
+  border: 1px solid rgba(251, 191, 36, 0.2);
+}

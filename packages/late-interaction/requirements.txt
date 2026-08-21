@@ -1,0 +1,10 @@
+torch>=2.4.0
+transformers>=4.45.0
+colpali-engine>=0.3.0
+qdrant-client>=1.12.0
+numpy>=1.26.0
+scipy>=1.13.0
+einops>=0.8.0
+pillow>=10.4.0
+pydantic>=2.8.0
+tqdm>=4.66.0

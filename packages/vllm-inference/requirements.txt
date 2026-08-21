@@ -1,0 +1,11 @@
+vllm>=0.6.3
+torch>=2.4.0
+transformers>=4.45.0
+accelerate>=0.34.0
+qwen-vl-utils>=0.0.8
+pydantic>=2.8.0
+fastapi>=0.115.0
+uvicorn>=0.30.0
+pillow>=10.4.0
+requests>=2.32.0
+aiohttp>=3.10.0
