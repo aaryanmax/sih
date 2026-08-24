@@ -43,9 +43,16 @@ from multi_search import (  # type: ignore
     ColPaliRetrieverBackend,
     MockVideoSearchBackend,
 )
+from config import get_settings  # type: ignore
+
+try:
+    from rapidfuzz import fuzz
+except ImportError:
+    fuzz = None
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+settings = get_settings()
 
 # ---------------------------------------------------------------------------
 # Module-level singletons — loaded once at FastAPI startup
@@ -59,14 +66,18 @@ _mock_multi_engine: Optional[MultiIntentEngine] = None
 def _get_retriever() -> LateInteractionRetriever:
     global _retriever
     if _retriever is None:
-        _retriever = LateInteractionRetriever()
+        _retriever = LateInteractionRetriever(
+            collection_name=settings.QDRANT_COLLECTION,
+            vector_name=settings.QDRANT_VECTOR_NAME,
+            merge_gap=settings.MERGE_GAP_SECONDS,
+        )
     return _retriever
 
 
 def _get_explainability() -> ExplainabilityService:
     global _explainability
     if _explainability is None:
-        _explainability = ExplainabilityService(timeout_s=1.5)
+        _explainability = ExplainabilityService(timeout_s=settings.EXPLAINABILITY_TIMEOUT_S)
     return _explainability
 
 
@@ -103,7 +114,11 @@ class SearchResultItem(BaseModel):
     start_time: float
     end_time: float
     score: float
+    visual_score: Optional[float] = None
+    whisper_score: Optional[float] = None
+    ocr_score: Optional[float] = None
     explanation: str
+    rationale: Optional[str] = None
     dataset_source: str
     # Optional enrichment fields
     transcript_text: Optional[str] = None
@@ -132,18 +147,47 @@ class MultiIntentSearchResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Scoring helper: Hybrid Modality Fusion (ColPali MaxSim + RapidFuzz)
+# ---------------------------------------------------------------------------
+
+def _compute_modality_scores(query: str, scene) -> tuple[float, float, float, float]:
+    """Computes (fused_score, visual_score, whisper_score, ocr_score)."""
+    visual_score = round(float(scene.score), 4)
+    transcript = (scene.transcript_text or "").strip()
+    ocr = (scene.ocr_text or "").strip()
+
+    whisper_score = 0.0
+    ocr_score = 0.0
+
+    if fuzz and query:
+        q_lower = query.lower()
+        if transcript:
+            whisper_score = round(fuzz.partial_ratio(q_lower, transcript.lower()) / 100.0, 4)
+        if ocr:
+            ocr_score = round(fuzz.partial_ratio(q_lower, ocr.lower()) / 100.0, 4)
+
+    # Hybrid multi-signal fusion formula from Kapy
+    if whisper_score > 0 or ocr_score > 0:
+        fused_score = round(
+            (visual_score * settings.WEIGHT_VISUAL)
+            + (whisper_score * settings.WEIGHT_WHISPER)
+            + (ocr_score * settings.WEIGHT_OCR),
+            4,
+        )
+    else:
+        fused_score = visual_score
+
+    return fused_score, visual_score, whisper_score, ocr_score
+
+
+# ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
 
 @router.post("/api/v1/search", response_model=SearchResponse)
 async def search_endpoint(req: SearchRequest):
     """
-    Primary multimodal search endpoint.
-
-    1. Encodes the query with ColQwen2 (CPU, singleton — no cold start after first call).
-    2. Executes Qdrant MaxSim late-interaction retrieval with temporal deduplication.
-    3. Fans out async Gemini explanation requests in parallel for all scenes.
-    4. Returns structured JSON with playback metadata.
+    Primary multimodal search endpoint with Hybrid Fusion (ColPali + RapidFuzz OCR/Whisper).
     """
     logger.info("Search request: query='%s' top_k=%d", req.query, req.top_k)
 
@@ -185,21 +229,32 @@ async def search_endpoint(req: SearchRequest):
     # Fire all explanation requests concurrently
     explanations: List[str] = await asyncio.gather(*[_explain(s) for s in scenes])
 
-    # -- 4. Assemble response ----------------------------------------------
-    results = [
-        SearchResultItem(
-            video_id=scene.video_id,
-            video_url=scene.video_url,
-            start_time=scene.start_time,
-            end_time=scene.end_time,
-            score=scene.score,
-            explanation=explanations[i],
-            dataset_source=scene.dataset_source,
-            transcript_text=scene.transcript_text or None,
-            ocr_text=scene.ocr_text or None,
+    # -- 4. Assemble response with Hybrid Modality Score breakdown ---------
+    results = []
+    for i, scene in enumerate(scenes):
+        fused_score, vis_sc, whisp_sc, ocr_sc = _compute_modality_scores(req.query, scene)
+        explanation_text = explanations[i]
+
+        results.append(
+            SearchResultItem(
+                video_id=scene.video_id,
+                video_url=scene.video_url,
+                start_time=scene.start_time,
+                end_time=scene.end_time,
+                score=fused_score,
+                visual_score=vis_sc,
+                whisper_score=whisp_sc,
+                ocr_score=ocr_sc,
+                explanation=explanation_text,
+                rationale=explanation_text,
+                dataset_source=scene.dataset_source,
+                transcript_text=scene.transcript_text or None,
+                ocr_text=scene.ocr_text or None,
+            )
         )
-        for i, scene in enumerate(scenes)
-    ]
+
+    # Sort by fused score
+    results.sort(key=lambda item: item.score, reverse=True)
 
     logger.info(
         "Search complete: query='%s' → %d results (best score=%.3f)",
@@ -212,11 +267,6 @@ async def search_endpoint(req: SearchRequest):
 async def multi_intent_search_endpoint(req: MultiIntentSearchRequest):
     """
     Multi-Intent Hierarchical Search endpoint.
-
-    1. Decomposes user topic/query into visual intent stages (Gemini 3.5 Flash-Lite).
-    2. Concurrently retrieves and normalizes top-K scenes per intent stage.
-    3. Asynchronously generates explanations for key retrieved scenes.
-    4. Returns structured multi-intent journey playlist.
     """
     logger.info("Multi-intent search request: query='%s' top_k=%d mock=%s", req.query, req.top_k_per_intent, req.use_mock)
 
@@ -234,7 +284,7 @@ async def multi_intent_search_endpoint(req: MultiIntentSearchRequest):
 
     intent_items: List[IntentResultItem] = []
 
-    # Assemble explainability for each intent's results
+    # Assemble explainability and modality scores for each intent's results
     for intent_group in multi_result.intents:
         scenes = intent_group.results
 
@@ -251,20 +301,29 @@ async def multi_intent_search_endpoint(req: MultiIntentSearchRequest):
 
         if scenes:
             explanations = await asyncio.gather(*[_explain_intent_scene(s) for s in scenes])
-            result_items = [
-                SearchResultItem(
-                    video_id=scene.video_id,
-                    video_url=scene.video_url,
-                    start_time=scene.start_time,
-                    end_time=scene.end_time,
-                    score=scene.score,
-                    explanation=explanations[i],
-                    dataset_source=scene.dataset_source,
-                    transcript_text=scene.transcript_text or None,
-                    ocr_text=scene.ocr_text or None,
+            result_items = []
+            for i, scene in enumerate(scenes):
+                fused_score, vis_sc, whisp_sc, ocr_sc = _compute_modality_scores(intent_group.objective, scene)
+                explanation_text = explanations[i]
+
+                result_items.append(
+                    SearchResultItem(
+                        video_id=scene.video_id,
+                        video_url=scene.video_url,
+                        start_time=scene.start_time,
+                        end_time=scene.end_time,
+                        score=fused_score,
+                        visual_score=vis_sc,
+                        whisper_score=whisp_sc,
+                        ocr_score=ocr_sc,
+                        explanation=explanation_text,
+                        rationale=explanation_text,
+                        dataset_source=scene.dataset_source,
+                        transcript_text=scene.transcript_text or None,
+                        ocr_text=scene.ocr_text or None,
+                    )
                 )
-                for i, scene in enumerate(scenes)
-            ]
+            result_items.sort(key=lambda item: item.score, reverse=True)
         else:
             result_items = []
 

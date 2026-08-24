@@ -41,6 +41,10 @@ export interface VideoKeyframeMatch {
   patchHeatmap: number[]; // 64 values (8x8 grid) between 0 and 1
   timelineHeatmap?: TimelinePoint[];
   multiVectorScores?: MultiVectorScorePoint[];
+  visual_score?: number;
+  whisper_score?: number;
+  ocr_score?: number;
+  rationale?: string;
   next_part_id?: string | null;
   next_part_title?: string | null;
   next_part_url?: string | null;
