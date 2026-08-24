@@ -10,9 +10,8 @@
 # ==============================================================================
 # Large datasets & payload files (> 100 MB GitHub limit)
 # ==============================================================================
-data/*.json
-data/qdrant_payload_*.json
-data/raw_videos/
+data/
+*.tsbuildinfo
 data/extracted_frames/
 data/audio_chunks/
 /qdrant_storage/

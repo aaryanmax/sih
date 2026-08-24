@@ -16,3 +16,18 @@ ignore = [
 [tool.black]
 line-length = 120
 target-version = ['py311']
+
+[tool.pyright]
+include = ["packages", "apps", "scripts"]
+extraPaths = [
+    ".",
+    "packages",
+    "packages/multi_search",
+    "packages/retrieval",
+    "packages/embeddings",
+    "packages/audio-ocr",
+    "packages/vlm-engine",
+    "packages/vllm-inference",
+    "packages/pipeline",
+    "apps/api"
+]

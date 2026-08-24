@@ -238,3 +238,27 @@ video {
   color: var(--amber-400);
   border: 1px solid rgba(251, 191, 36, 0.2);
 }
+
+/* ─── 2026 Android Expressive & Semantic Radar Enhancements ──────────────── */
+.radar-pulse {
+  animation: radarGlow 2s infinite ease-in-out;
+}
+
+@keyframes radarGlow {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(99, 102, 241, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.6), 0 0 30px rgba(139, 92, 246, 0.4);
+  }
+}
+
+/* Hide scrollbar for clean chip sliders */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+

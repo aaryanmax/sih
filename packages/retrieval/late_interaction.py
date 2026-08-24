@@ -32,8 +32,8 @@ logger = logging.getLogger(__name__)
 # Constants
 # ---------------------------------------------------------------------------
 
-COLLECTION_NAME: str = os.getenv("QDRANT_COLLECTION", "video_chunks")
-VECTOR_NAME: str = "visual_patches"
+COLLECTION_NAME: str = os.getenv("QDRANT_COLLECTION", "video_frames")
+VECTOR_NAME: str = os.getenv("QDRANT_VECTOR_NAME", "colqwen")
 MERGE_GAP_SECONDS: float = 4.0   # Adjacent chunks closer than this are merged
 VIDEO_URL_TEMPLATE: str = "/videos/{dataset}/{filename}"
 
@@ -63,7 +63,7 @@ class SceneResult:
 
 class LateInteractionRetriever:
     """
-    ColPali-style late-interaction retrieval backed by Qdrant MaxSim.
+    ColPali/ColQwen late-interaction retrieval backed by Qdrant MaxSim.
 
     Parameters
     ----------
@@ -77,24 +77,44 @@ class LateInteractionRetriever:
     def __init__(
         self,
         collection_name: str = COLLECTION_NAME,
+        vector_name: str = VECTOR_NAME,
         merge_gap: float = MERGE_GAP_SECONDS,
     ) -> None:
         self.collection_name = collection_name
+        self.vector_name = vector_name
         self.merge_gap = merge_gap
 
-        qdrant_host = os.getenv("QDRANT_HOST", "localhost")
+        # Check for local data directory
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+        local_data_path = os.getenv("QDRANT_PATH", os.path.join(project_root, "data"))
+
+        qdrant_host = os.getenv("QDRANT_HOST")
         qdrant_port = int(os.getenv("QDRANT_PORT", "6333"))
 
+        # If local data exists and no explicit remote host is configured, prefer local embedded SQLite
+        if os.path.exists(local_data_path) and (not qdrant_host or qdrant_host == "localhost"):
+            try:
+                self.client = QdrantClient(path=local_data_path)
+                logger.info(
+                    "LateInteractionRetriever connected to local embedded Qdrant at %s (collection=%s, vector=%s)",
+                    local_data_path, collection_name, vector_name,
+                )
+                return
+            except Exception as e:
+                logger.warning("Could not open embedded Qdrant at %s (%s). Trying network client...", local_data_path, e)
+
+        # Fallback to network client
+        host = qdrant_host or "localhost"
         self.client = QdrantClient(
-            host=qdrant_host,
+            host=host,
             port=qdrant_port,
-            prefer_grpc=False,          # Force HTTP REST — avoids 4 MB gRPC limit
-            timeout=60,
+            prefer_grpc=False,
+            timeout=30,
             check_compatibility=False,
         )
         logger.info(
-            "LateInteractionRetriever connected to Qdrant at %s:%s (collection=%s)",
-            qdrant_host, qdrant_port, collection_name,
+            "LateInteractionRetriever connected to Qdrant server at %s:%s (collection=%s, vector=%s)",
+            host, qdrant_port, collection_name, vector_name,
         )
 
     # ------------------------------------------------------------------
@@ -134,7 +154,7 @@ class LateInteractionRetriever:
             results: List[ScoredPoint] = self.client.query_points(
                 collection_name=self.collection_name,
                 query=query_vectors,            # multi-vector: list[list[float]]
-                using=VECTOR_NAME,
+                using=self.vector_name,
                 limit=raw_limit,
                 with_payload=True,
                 score_threshold=score_threshold,
@@ -274,7 +294,7 @@ if __name__ == "__main__":
     from embeddings.query_encoder import encode_query  # type: ignore
 
     vecs = encode_query(query_text)
-    print(f"Query encoded: {len(vecs)} tokens × {len(vecs[0])} dims")
+    print(f"Query encoded: {len(vecs)} tokens x {len(vecs[0])} dims")
 
     retriever = LateInteractionRetriever()
     scenes = retriever.search(vecs, top_k=5)
@@ -283,6 +303,6 @@ if __name__ == "__main__":
         print("No results — is Qdrant seeded?")
     for i, s in enumerate(scenes, 1):
         print(
-            f"  [{i}] {s.video_id}  {s.start_time:.1f}s→{s.end_time:.1f}s  "
+            f"  [{i}] {s.video_id}  {s.start_time:.1f}s -> {s.end_time:.1f}s  "
             f"score={s.score:.4f}  src={s.dataset_source}"
         )

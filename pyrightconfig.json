@@ -1,0 +1,24 @@
+{
+  "include": [
+    "packages",
+    "apps",
+    "scripts"
+  ],
+  "exclude": [
+    "**/node_modules",
+    "**/__pycache__",
+    "src"
+  ],
+  "extraPaths": [
+    ".",
+    "packages",
+    "packages/multi_search",
+    "packages/retrieval",
+    "packages/embeddings",
+    "packages/audio-ocr",
+    "packages/vlm-engine",
+    "packages/vllm-inference",
+    "packages/pipeline",
+    "apps/api"
+  ]
+}

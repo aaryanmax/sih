@@ -3,8 +3,9 @@ import { VideoKeyframeMatch } from '../types';
 export const sampleKeyframeMatches: VideoKeyframeMatch[] = [
   {
     id: 'match_1',
-    videoId: 'sih_lecture_01',
-    videoTitle: 'Lecture 14: ColPali Multi-Vector Late Interaction & Vision Transformers.mp4',
+    videoId: 'sih_lecture_01_part1',
+    videoTitle: 'Lecture 14: ColPali Multi-Vector Late Interaction & Vision Transformers (Part 1).mp4',
+    videoUrl: '/videos/UCF101/lecture_colpali_part1.mp4',
     timestampSeconds: 165.2,
     timestampFormatted: '02:45',
     score: 0.962,
@@ -38,12 +39,30 @@ export const sampleKeyframeMatches: VideoKeyframeMatch[] = [
       else if (Math.abs(ts - 165.2) < 40) score = 0.6;
       else if (ts === 300) score = 0.4;
       return { timestamp: ts, score };
-    })
+    }),
+    next_part_id: 'sih_tutorial_02',
+    next_part_title: 'Part 2: Workshop: Fast Multimodal Ingestion with PaddleOCR & WhisperX',
+    next_part_url: '/videos/UCF101/tutorial_paddle_whisper.mp4',
+    multiVectorScores: [
+      { tokenOrPatchId: 'tok_0', timestampSeconds: 20, score: 0.22, modality: 'visual_patches', label: 'Intro Hook' },
+      { tokenOrPatchId: 'tok_1', timestampSeconds: 60, score: 0.38, modality: 'speech_audio', label: 'Overview Speech' },
+      { tokenOrPatchId: 'tok_2', timestampSeconds: 110, score: 0.55, modality: 'ocr_text', label: 'Slide Index' },
+      { tokenOrPatchId: 'tok_3', timestampSeconds: 150, score: 0.88, modality: 'visual_patches', label: 'ColPali Token Matrix' },
+      { tokenOrPatchId: 'tok_4', timestampSeconds: 165.2, score: 0.98, modality: 'visual_patches', label: 'MaxSim Formula Peak' },
+      { tokenOrPatchId: 'tok_5', timestampSeconds: 175, score: 0.94, modality: 'visual_patches', label: 'Patch Embedding Layer' },
+      { tokenOrPatchId: 'tok_6', timestampSeconds: 220, score: 0.72, modality: 'speech_audio', label: 'Transformer Explanation' },
+      { tokenOrPatchId: 'tok_7', timestampSeconds: 280, score: 0.45, modality: 'ocr_text', label: 'Code Snippet' },
+      { tokenOrPatchId: 'tok_8', timestampSeconds: 340, score: 0.35, modality: 'visual_patches', label: 'Architecture Overview' },
+      { tokenOrPatchId: 'tok_9', timestampSeconds: 420, score: 0.62, modality: 'speech_audio', label: 'Loss Function Discussion' },
+      { tokenOrPatchId: 'tok_10', timestampSeconds: 500, score: 0.78, modality: 'visual_patches', label: 'Recall Comparison Graph' },
+      { tokenOrPatchId: 'tok_11', timestampSeconds: 580, score: 0.85, modality: 'speech_audio', label: 'Wrap-up & Next Part' },
+    ]
   },
   {
     id: 'match_2',
     videoId: 'sih_tutorial_02',
     videoTitle: 'Workshop: Fast Multimodal Ingestion with PaddleOCR & WhisperX.mp4',
+    videoUrl: '/videos/UCF101/tutorial_paddle_whisper.mp4',
     timestampSeconds: 438.0,
     timestampFormatted: '07:18',
     score: 0.914,
@@ -75,12 +94,26 @@ export const sampleKeyframeMatches: VideoKeyframeMatch[] = [
       if (Math.abs(ts - 438.0) < 20) score = 0.914;
       else if (Math.abs(ts - 438.0) < 40) score = 0.5;
       return { timestamp: ts, score };
-    })
+    }),
+    next_part_id: 'sih_demo_03',
+    next_part_title: 'Part 3: Live Demo: Autonomous Drone Surveillance & Object Detection',
+    next_part_url: '/videos/UCF101/drone_surveillance.mp4',
+    multiVectorScores: [
+      { tokenOrPatchId: 'tok_0', timestampSeconds: 15, score: 0.30, modality: 'speech_audio', label: 'Recap' },
+      { tokenOrPatchId: 'tok_1', timestampSeconds: 40, score: 0.92, modality: 'ocr_text', label: 'Qdrant Client Setup' },
+      { tokenOrPatchId: 'tok_2', timestampSeconds: 65, score: 0.95, modality: 'ocr_text', label: 'MultiVectorConfig Parameter' },
+      { tokenOrPatchId: 'tok_3', timestampSeconds: 120, score: 0.65, modality: 'visual_patches', label: 'Vector Pipeline Graph' },
+      { tokenOrPatchId: 'tok_4', timestampSeconds: 200, score: 0.82, modality: 'visual_patches', label: 'VRAM Benchmarks' },
+      { tokenOrPatchId: 'tok_5', timestampSeconds: 310, score: 0.58, modality: 'speech_audio', label: 'Query Encoding Walkthrough' },
+      { tokenOrPatchId: 'tok_6', timestampSeconds: 420, score: 0.74, modality: 'visual_patches', label: 'Latency Comparison' },
+      { tokenOrPatchId: 'tok_7', timestampSeconds: 510, score: 0.40, modality: 'ocr_text', label: 'Summary Slide' },
+    ]
   },
   {
     id: 'match_3',
     videoId: 'sih_demo_03',
     videoTitle: 'Live Demo: Autonomous Drone Surveillance & Object Detection.mp4',
+    videoUrl: '/videos/UCF101/drone_surveillance.mp4',
     timestampSeconds: 52.4,
     timestampFormatted: '00:52',
     score: 0.882,
@@ -110,12 +143,25 @@ export const sampleKeyframeMatches: VideoKeyframeMatch[] = [
       let score = Math.random() * 0.1 + 0.05;
       if (Math.abs(ts - 52.4) < 15) score = 0.882;
       return { timestamp: ts, score };
-    })
+    }),
+    next_part_id: null,
+    next_part_title: null,
+    next_part_url: null,
+    multiVectorScores: [
+      { tokenOrPatchId: 'tok_0', timestampSeconds: 10, score: 0.35, modality: 'visual_patches', label: 'Takeoff Telemetry' },
+      { tokenOrPatchId: 'tok_1', timestampSeconds: 35, score: 0.60, modality: 'visual_patches', label: 'Intersection Sweep' },
+      { tokenOrPatchId: 'tok_2', timestampSeconds: 52.4, score: 0.94, modality: 'visual_patches', label: 'Vehicle Identification' },
+      { tokenOrPatchId: 'tok_3', timestampSeconds: 65, score: 0.89, modality: 'ocr_text', label: 'GPS Coordinate Lock' },
+      { tokenOrPatchId: 'tok_4', timestampSeconds: 140, score: 0.70, modality: 'speech_audio', label: 'Operator Comm' },
+      { tokenOrPatchId: 'tok_5', timestampSeconds: 210, score: 0.50, modality: 'visual_patches', label: 'Perimeter Sweep' },
+      { tokenOrPatchId: 'tok_6', timestampSeconds: 320, score: 0.42, modality: 'visual_patches', label: 'Return to Base' },
+    ]
   },
   {
     id: 'match_4',
     videoId: 'sih_lecture_01',
     videoTitle: 'Lecture 14: ColPali Multi-Vector Late Interaction & Vision Transformers.mp4',
+    videoUrl: '/videos/UCF101/lecture_colpali_part1.mp4',
     timestampSeconds: 580.0,
     timestampFormatted: '09:40',
     score: 0.851,
@@ -145,6 +191,17 @@ export const sampleKeyframeMatches: VideoKeyframeMatch[] = [
       let score = Math.random() * 0.1 + 0.05;
       if (Math.abs(ts - 89.0) < 15) score = 0.841;
       return { timestamp: ts, score };
-    })
+    }),
+    next_part_id: null,
+    next_part_title: null,
+    next_part_url: null,
+    multiVectorScores: [
+      { tokenOrPatchId: 'tok_0', timestampSeconds: 20, score: 0.25, modality: 'ocr_text', label: 'Benchmark Agenda' },
+      { tokenOrPatchId: 'tok_1', timestampSeconds: 80, score: 0.55, modality: 'visual_patches', label: 'Baseline CLIP Matrix' },
+      { tokenOrPatchId: 'tok_2', timestampSeconds: 120, score: 0.91, modality: 'speech_audio', label: 'Recall@1 Gain Discussion' },
+      { tokenOrPatchId: 'tok_3', timestampSeconds: 145, score: 0.86, modality: 'ocr_text', label: 'Recall Metrics Chart' },
+      { tokenOrPatchId: 'tok_4', timestampSeconds: 260, score: 0.65, modality: 'visual_patches', label: 'Storage Overhead Graph' },
+      { tokenOrPatchId: 'tok_5', timestampSeconds: 380, score: 0.48, modality: 'speech_audio', label: 'Conclusion & Takeaways' },
+    ]
   }
 ];

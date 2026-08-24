@@ -11,7 +11,7 @@ Pipeline per request:
   1. Encode query text → ColQwen2 multi-vector tokens (CPU, bfloat16)
   2. Qdrant MaxSim query_points → raw chunk hits
   3. Temporal deduplication → cohesive scene intervals
-  4. Gemini 1.5 Flash → one-sentence explainability summary (async, 1.5 s budget)
+  4. Gemini 3.5 Flash-Lite → one-sentence explainability summary (async, 1.5 s budget)
   5. Return structured JSON matching the spec
 """
 
@@ -37,6 +37,12 @@ sys.path.insert(0, os.path.join(_project_root, "apps", "api"))
 from embeddings.query_encoder import encode_query  # type: ignore
 from retrieval.late_interaction import LateInteractionRetriever  # type: ignore
 from services.explainability import ExplainabilityService  # type: ignore
+from multi_search import (  # type: ignore
+    MultiIntentEngine,
+    MultiSearchPlanner,
+    ColPaliRetrieverBackend,
+    MockVideoSearchBackend,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -46,6 +52,8 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 _retriever: Optional[LateInteractionRetriever] = None
 _explainability: Optional[ExplainabilityService] = None
+_multi_engine: Optional[MultiIntentEngine] = None
+_mock_multi_engine: Optional[MultiIntentEngine] = None
 
 
 def _get_retriever() -> LateInteractionRetriever:
@@ -62,6 +70,18 @@ def _get_explainability() -> ExplainabilityService:
     return _explainability
 
 
+def _get_multi_engine(use_mock: bool = False) -> MultiIntentEngine:
+    global _multi_engine, _mock_multi_engine
+    if use_mock:
+        if _mock_multi_engine is None:
+            _mock_multi_engine = MultiIntentEngine(backend=MockVideoSearchBackend())
+        return _mock_multi_engine
+    if _multi_engine is None:
+        backend = ColPaliRetrieverBackend(retriever=_get_retriever())
+        _multi_engine = MultiIntentEngine(backend=backend)
+    return _multi_engine
+
+
 # ---------------------------------------------------------------------------
 # Pydantic schemas
 # ---------------------------------------------------------------------------
@@ -69,6 +89,12 @@ def _get_explainability() -> ExplainabilityService:
 class SearchRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=512, description="Natural-language search query")
     top_k: int = Field(default=10, ge=1, le=50, description="Number of results to return")
+
+
+class MultiIntentSearchRequest(BaseModel):
+    query: str = Field(..., min_length=1, max_length=512, description="Broad natural-language topic or question")
+    top_k_per_intent: int = Field(default=5, ge=1, le=20, description="Number of results per intent stage")
+    use_mock: bool = Field(default=False, description="Whether to use mock backend (useful for offline demos)")
 
 
 class SearchResultItem(BaseModel):
@@ -82,6 +108,14 @@ class SearchResultItem(BaseModel):
     # Optional enrichment fields
     transcript_text: Optional[str] = None
     ocr_text: Optional[str] = None
+    next_part_id: Optional[str] = None
+    multi_vector_scores: Optional[List[float]] = None
+
+
+class IntentResultItem(BaseModel):
+    intent: str
+    objective: str
+    results: List[SearchResultItem]
 
 
 class SearchResponse(BaseModel):
@@ -90,8 +124,15 @@ class SearchResponse(BaseModel):
     results: List[SearchResultItem]
 
 
+class MultiIntentSearchResponse(BaseModel):
+    query: str
+    topic: str
+    total_intents: int
+    intents: List[IntentResultItem]
+
+
 # ---------------------------------------------------------------------------
-# Route
+# Routes
 # ---------------------------------------------------------------------------
 
 @router.post("/api/v1/search", response_model=SearchResponse)
@@ -165,3 +206,79 @@ async def search_endpoint(req: SearchRequest):
         req.query, len(results), results[0].score if results else 0,
     )
     return SearchResponse(query=req.query, total=len(results), results=results)
+
+
+@router.post("/api/v1/search/multi-intent", response_model=MultiIntentSearchResponse)
+async def multi_intent_search_endpoint(req: MultiIntentSearchRequest):
+    """
+    Multi-Intent Hierarchical Search endpoint.
+
+    1. Decomposes user topic/query into visual intent stages (Gemini 3.5 Flash-Lite).
+    2. Concurrently retrieves and normalizes top-K scenes per intent stage.
+    3. Asynchronously generates explanations for key retrieved scenes.
+    4. Returns structured multi-intent journey playlist.
+    """
+    logger.info("Multi-intent search request: query='%s' top_k=%d mock=%s", req.query, req.top_k_per_intent, req.use_mock)
+
+    engine = _get_multi_engine(use_mock=req.use_mock)
+    explainability = _get_explainability()
+
+    try:
+        multi_result = engine.search(
+            user_query=req.query,
+            top_k=req.top_k_per_intent,
+        )
+    except Exception as exc:
+        logger.error("Multi-intent search execution failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Multi-intent engine error: {exc}")
+
+    intent_items: List[IntentResultItem] = []
+
+    # Assemble explainability for each intent's results
+    for intent_group in multi_result.intents:
+        scenes = intent_group.results
+
+        async def _explain_intent_scene(scene) -> str:
+            return await explainability.generate_explanation(
+                query=f"{multi_result.topic}: {intent_group.objective}",
+                video_id=scene.video_id,
+                start_time=scene.start_time,
+                end_time=scene.end_time,
+                score=scene.score,
+                transcript_text=scene.transcript_text or "",
+                ocr_text=scene.ocr_text or "",
+            )
+
+        if scenes:
+            explanations = await asyncio.gather(*[_explain_intent_scene(s) for s in scenes])
+            result_items = [
+                SearchResultItem(
+                    video_id=scene.video_id,
+                    video_url=scene.video_url,
+                    start_time=scene.start_time,
+                    end_time=scene.end_time,
+                    score=scene.score,
+                    explanation=explanations[i],
+                    dataset_source=scene.dataset_source,
+                    transcript_text=scene.transcript_text or None,
+                    ocr_text=scene.ocr_text or None,
+                )
+                for i, scene in enumerate(scenes)
+            ]
+        else:
+            result_items = []
+
+        intent_items.append(
+            IntentResultItem(
+                intent=intent_group.intent,
+                objective=intent_group.objective,
+                results=result_items,
+            )
+        )
+
+    return MultiIntentSearchResponse(
+        query=req.query,
+        topic=multi_result.topic,
+        total_intents=len(intent_items),
+        intents=intent_items,
+    )
