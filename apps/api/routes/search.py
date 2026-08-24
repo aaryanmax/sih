@@ -21,6 +21,7 @@ import asyncio
 import logging
 import os
 import sys
+import traceback
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException
@@ -34,16 +35,17 @@ _project_root = os.path.abspath(os.path.join(_current_dir, "..", "..", ".."))
 sys.path.insert(0, os.path.join(_project_root, "packages"))
 sys.path.insert(0, os.path.join(_project_root, "apps", "api"))
 
+from config import get_settings  # type: ignore
 from embeddings.query_encoder import encode_query  # type: ignore
-from retrieval.late_interaction import LateInteractionRetriever  # type: ignore
-from services.explainability import ExplainabilityService  # type: ignore
 from multi_search import (  # type: ignore
-    MultiIntentEngine,
-    MultiSearchPlanner,
     ColPaliRetrieverBackend,
     MockVideoSearchBackend,
+    MultiIntentEngine,
+    MultiSearchPlanner,
 )
-from config import get_settings  # type: ignore
+from pipeline.url_ingest import download_and_process_url  # type: ignore
+from retrieval.late_interaction import LateInteractionRetriever  # type: ignore
+from services.explainability import ExplainabilityService  # type: ignore
 
 try:
     from rapidfuzz import fuzz
@@ -96,6 +98,7 @@ def _get_multi_engine(use_mock: bool = False) -> MultiIntentEngine:
 # ---------------------------------------------------------------------------
 # Pydantic schemas
 # ---------------------------------------------------------------------------
+
 
 class SearchRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=512, description="Natural-language search query")
@@ -150,6 +153,7 @@ class MultiIntentSearchResponse(BaseModel):
 # Scoring helper: Hybrid Modality Fusion (ColPali MaxSim + RapidFuzz)
 # ---------------------------------------------------------------------------
 
+
 def _compute_modality_scores(query: str, scene) -> tuple[float, float, float, float]:
     """Computes (fused_score, visual_score, whisper_score, ocr_score)."""
     visual_score = round(float(scene.score), 4)
@@ -183,6 +187,7 @@ def _compute_modality_scores(query: str, scene) -> tuple[float, float, float, fl
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+
 
 @router.post("/api/v1/search", response_model=SearchResponse)
 async def search_endpoint(req: SearchRequest):
@@ -256,11 +261,21 @@ async def search_endpoint(req: SearchRequest):
     # Sort by fused score
     results.sort(key=lambda item: item.score, reverse=True)
 
+    # Filter out low-confidence noise (random vector matches without text matches)
+    filtered_results = []
+    for r in results:
+        # If no textual match and visual score is very low, it's likely noise
+        if r.whisper_score < 0.05 and r.ocr_score < 0.05 and r.visual_score < 0.6:
+            continue
+        filtered_results.append(r)
+
     logger.info(
         "Search complete: query='%s' → %d results (best score=%.3f)",
-        req.query, len(results), results[0].score if results else 0,
+        req.query,
+        len(filtered_results),
+        filtered_results[0].score if filtered_results else 0,
     )
-    return SearchResponse(query=req.query, total=len(results), results=results)
+    return SearchResponse(query=req.query, total=len(filtered_results), results=filtered_results)
 
 
 @router.post("/api/v1/search/multi-intent", response_model=MultiIntentSearchResponse)
@@ -268,7 +283,9 @@ async def multi_intent_search_endpoint(req: MultiIntentSearchRequest):
     """
     Multi-Intent Hierarchical Search endpoint.
     """
-    logger.info("Multi-intent search request: query='%s' top_k=%d mock=%s", req.query, req.top_k_per_intent, req.use_mock)
+    logger.info(
+        "Multi-intent search request: query='%s' top_k=%d mock=%s", req.query, req.top_k_per_intent, req.use_mock
+    )
 
     engine = _get_multi_engine(use_mock=req.use_mock)
     explainability = _get_explainability()
@@ -341,3 +358,57 @@ async def multi_intent_search_endpoint(req: MultiIntentSearchRequest):
         total_intents=len(intent_items),
         intents=intent_items,
     )
+
+
+class IngestUrlRequest(BaseModel):
+    url: str = Field(..., description="YouTube Short, Instagram Reel, or direct MP4 URL")
+    force: bool = Field(default=False, description="Whether to force re-indexing with Gemini Vision")
+
+
+@router.post("/api/v1/ingest/url")
+async def ingest_url(req: IngestUrlRequest):
+    """
+    Downloads and indexes a vertical video URL on the fly using yt-dlp and Gemini Vision.
+    """
+    try:
+        loop = asyncio.get_running_loop()
+        retriever = _get_retriever()
+        qdrant_client = retriever.client
+        # Run blocking download and processing in an executor
+        result = await loop.run_in_executor(None, download_and_process_url, req.url, qdrant_client, req.force)
+        return result
+    except Exception as e:
+        logger.error(f"Failed to ingest URL {req.url}: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/v1/debug/video/{filename}")
+async def debug_video(filename: str):
+    retriever = _get_retriever()
+    from qdrant_client.models import FieldCondition, Filter, MatchValue
+
+    try:
+        pts, _ = retriever.client.scroll(
+            collection_name=retriever.collection_name,
+            scroll_filter=Filter(must=[FieldCondition(key="video_filename", match=MatchValue(value=filename))]),
+            limit=20,
+            with_payload=True,
+            with_vectors=True,
+        )
+        return {
+            "filename": filename,
+            "points_count": len(pts),
+            "points": [
+                {
+                    "id": p.id,
+                    "payload": p.payload,
+                    "vector_shape": len(p.vector[retriever.vector_name])
+                    if isinstance(p.vector, dict) and retriever.vector_name in p.vector
+                    else None,
+                }
+                for p in pts
+            ],
+        }
+    except Exception as e:
+        return {"error": str(e)}

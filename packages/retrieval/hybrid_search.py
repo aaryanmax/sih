@@ -26,8 +26,8 @@ current_dir = os.path.dirname(__file__)
 packages_dir = os.path.abspath(os.path.join(current_dir, ".."))
 sys.path.append(os.path.join(packages_dir, "embeddings"))
 
-COLLECTION_NAME: str = os.getenv("QDRANT_COLLECTION", "video_chunks")
-VECTOR_NAME: str = "visual_patches"
+COLLECTION_NAME: str = os.getenv("QDRANT_COLLECTION", "video_frames")
+VECTOR_NAME: str = os.getenv("QDRANT_VECTOR_NAME", "colqwen")
 
 
 class HybridRetriever:
@@ -42,9 +42,9 @@ class HybridRetriever:
     """
 
     # Hybrid score weights
-    ALPHA: float = 0.70   # Visual MaxSim
-    BETA: float  = 0.20   # Transcript
-    GAMMA: float = 0.10   # OCR
+    ALPHA: float = 0.70  # Visual MaxSim
+    BETA: float = 0.20  # Transcript
+    GAMMA: float = 0.10  # OCR
 
     def __init__(self, collection_name: str = COLLECTION_NAME) -> None:
         self.collection_name = collection_name
@@ -55,13 +55,15 @@ class HybridRetriever:
         self.client = QdrantClient(
             host=qdrant_host,
             port=qdrant_port,
-            prefer_grpc=False,          # Force HTTP REST
+            prefer_grpc=False,  # Force HTTP REST
             timeout=60,
             check_compatibility=False,
         )
         logger.info(
             "HybridRetriever connected to %s:%s (collection=%s)",
-            qdrant_host, qdrant_port, collection_name,
+            qdrant_host,
+            qdrant_port,
+            collection_name,
         )
 
     # ------------------------------------------------------------------
@@ -106,7 +108,7 @@ class HybridRetriever:
                 collection_name=self.collection_name,
                 query=query_multi_vector,
                 using=VECTOR_NAME,
-                limit=top_k * 3,        # Over-fetch for re-rank
+                limit=top_k * 3,  # Over-fetch for re-rank
                 with_payload=True,
             ).points
         except Exception as exc:
@@ -124,30 +126,28 @@ class HybridRetriever:
         for point in raw:
             payload = point.payload or {}
             visual_score = point.score / max_score
-            audio_score  = self._lexical_score(query_terms, payload.get("transcript_text", ""))
-            ocr_score    = self._lexical_score(query_terms, payload.get("ocr_text", ""))
+            audio_score = self._lexical_score(query_terms, payload.get("transcript_text", ""))
+            ocr_score = self._lexical_score(query_terms, payload.get("ocr_text", ""))
 
-            blended_score = (
-                self.ALPHA * visual_score
-                + self.BETA  * audio_score
-                + self.GAMMA * ocr_score
+            blended_score = self.ALPHA * visual_score + self.BETA * audio_score + self.GAMMA * ocr_score
+
+            blended.append(
+                {
+                    "point_id": point.id,
+                    "video_id": payload.get("video_id"),
+                    "video_filename": payload.get("video_filename"),
+                    "dataset_source": payload.get("dataset_source", "UCF101"),
+                    "start_time": payload.get("start_time", 0.0),
+                    "end_time": payload.get("end_time", 2.0),
+                    "transcript_text": payload.get("transcript_text", ""),
+                    "ocr_text": payload.get("ocr_text", ""),
+                    "keyframe_url": payload.get("keyframe_url", ""),
+                    "visual_maxsim": round(visual_score, 4),
+                    "audio_score": round(audio_score, 4),
+                    "ocr_score": round(ocr_score, 4),
+                    "blended_score": round(blended_score, 4),
+                }
             )
-
-            blended.append({
-                "point_id":        point.id,
-                "video_id":        payload.get("video_id"),
-                "video_filename":  payload.get("video_filename"),
-                "dataset_source":  payload.get("dataset_source", "UCF101"),
-                "start_time":      payload.get("start_time", 0.0),
-                "end_time":        payload.get("end_time", 2.0),
-                "transcript_text": payload.get("transcript_text", ""),
-                "ocr_text":        payload.get("ocr_text", ""),
-                "keyframe_url":    payload.get("keyframe_url", ""),
-                "visual_maxsim":   round(visual_score, 4),
-                "audio_score":     round(audio_score, 4),
-                "ocr_score":       round(ocr_score, 4),
-                "blended_score":   round(blended_score, 4),
-            })
 
         blended.sort(key=lambda x: x["blended_score"], reverse=True)
         return blended[:top_k]

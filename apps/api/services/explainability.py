@@ -10,7 +10,7 @@ Key design decisions:
   - Uses google-genai async client with a hard timeout (default 1.5 s).
   - Falls back to a deterministic rule-based explanation if Gemini is
     unavailable, the API key is missing, or the call times out.
-  - Model: gemini-1.5-flash  (real model; gemini-3.5-flash-lite does not exist)
+  - Model: gemini-3.5-flash-lite (falls back to gemini-3.1-flash-lite)
   - Prompt is minimal and low-latency: single-turn, 64-token max output.
 """
 
@@ -30,16 +30,18 @@ logger = logging.getLogger(__name__)
 try:
     from google import genai
     from google.genai import types as genai_types
+
     _GENAI_AVAILABLE = True
 except ImportError:
-    genai = None          # type: ignore
-    genai_types = None    # type: ignore
+    genai = None  # type: ignore
+    genai_types = None  # type: ignore
     _GENAI_AVAILABLE = False
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _load_env_fallback() -> None:
     """Populate os.environ from .env if GEMINI_API_KEY is not already set."""
@@ -71,6 +73,7 @@ def _load_env_fallback() -> None:
 # ---------------------------------------------------------------------------
 # Service
 # ---------------------------------------------------------------------------
+
 
 class ExplainabilityService:
     """
@@ -154,9 +157,9 @@ class ExplainabilityService:
         context = "; ".join(context_parts) or "no text context"
 
         prompt = (
-            f"Query: \"{query}\"\n"
+            f'Query: "{query}"\n'
             f"Video segment: {video_id} at {start_time:.1f}s–{end_time:.1f}s "
-            f"(match confidence {score*100:.0f}%)\n"
+            f"(match confidence {score * 100:.0f}%)\n"
             f"Context: {context}\n\n"
             "In exactly one concise sentence, explain why this video segment "
             "visually or contextually matches the query. "
@@ -164,22 +167,34 @@ class ExplainabilityService:
         )
 
         async def _call_gemini() -> str:
-            response = await self.client.aio.models.generate_content(
-                model=self.model,
-                contents=prompt,
-                config=genai_types.GenerateContentConfig(
-                    temperature=0.1,
-                    max_output_tokens=80,
-                ),
-            )
-            text = (response.text or "").strip()
-            # Truncate to first sentence
-            for sep in (".", "!", "?"):
-                idx = text.find(sep)
-                if idx != -1:
-                    text = text[: idx + 1]
-                    break
-            return text or fallback
+            models_to_try = [self.model, "gemini-3.1-flash-lite"] if self.model == "gemini-3.5-flash-lite" else [self.model]
+            
+            last_err = None
+            for model_id in models_to_try:
+                try:
+                    response = await self.client.aio.models.generate_content(
+                        model=model_id,
+                        contents=prompt,
+                        config=genai_types.GenerateContentConfig(
+                            temperature=0.1,
+                            max_output_tokens=80,
+                        ),
+                    )
+                    text = (response.text or "").strip()
+                    # Truncate to first sentence
+                    for sep in (".", "!", "?"):
+                        idx = text.find(sep)
+                        if idx != -1:
+                            text = text[: idx + 1]
+                            break
+                    return text or fallback
+                except Exception as e:
+                    last_err = e
+                    logger.warning("Model %s failed: %s", model_id, e)
+                    
+            if last_err:
+                raise last_err
+            return fallback
 
         try:
             return await asyncio.wait_for(_call_gemini(), timeout=self.timeout_s)
@@ -204,10 +219,7 @@ class ExplainabilityService:
     ) -> str:
         """Deterministic explanation template when Gemini is unavailable."""
         ts = f"{int(start_time // 60):02d}:{int(start_time % 60):02d}"
-        return (
-            f"Visual alignment with '{query}' detected at {ts} in {video_id} "
-            f"({score * 100:.0f}% confidence)."
-        )
+        return f"Visual alignment with '{query}' detected at {ts} in {video_id} ({score * 100:.0f}% confidence)."
 
 
 # ---------------------------------------------------------------------------
@@ -216,6 +228,7 @@ class ExplainabilityService:
 
 if __name__ == "__main__":
     import sys
+
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
     async def _test() -> None:

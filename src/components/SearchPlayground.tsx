@@ -234,7 +234,7 @@ export const SearchPlayground: React.FC = () => {
   }, [selectedMatch, duration]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6 w-full min-w-0">
       {/* ── Search Input & Modality Filter Bar (Mobile First) ── */}
       <div className="bg-slate-900/90 rounded-3xl border border-slate-800 p-4 sm:p-5 shadow-xl backdrop-blur-xl space-y-3">
         <div className="relative flex flex-col sm:flex-row gap-3">
@@ -308,7 +308,7 @@ export const SearchPlayground: React.FC = () => {
       </div>
 
       {/* ── Main Interactive Grid ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 items-start">
         {/* Left Column: Ranked Matches (lg:col-span-5) */}
         <div className="lg:col-span-5 space-y-3 order-2 lg:order-1">
           <div className="flex items-center justify-between px-1">
@@ -328,10 +328,11 @@ export const SearchPlayground: React.FC = () => {
                 <div
                   key={match.id}
                   onClick={() => handleSelectMatch(match)}
-                  className={`p-4 rounded-3xl border transition-all cursor-pointer relative overflow-hidden group ${
+                  style={{ animationDelay: `${filteredMatches.indexOf(match) * 80}ms` }}
+                  className={`p-4 rounded-3xl border transition-all duration-500 ease-out cursor-pointer relative overflow-hidden group animate-slide-up hover:-translate-y-1 hover:scale-[1.01] hover:shadow-[0_12px_35px_rgba(79,70,229,0.16)] ${
                     isSelected
-                      ? 'bg-slate-900 border-indigo-500 ring-2 ring-indigo-500/50 shadow-xl shadow-indigo-500/10'
-                      : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                      ? 'bg-slate-900 border-indigo-500 ring-2 ring-indigo-500/50 shadow-xl shadow-indigo-500/10 scale-[1.01]'
+                      : 'bg-slate-900/60 border-slate-800 hover:border-indigo-500/50'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -388,10 +389,10 @@ export const SearchPlayground: React.FC = () => {
         </div>
 
         {/* Right Column: Video Synchronizer & Radar Inspector (lg:col-span-7) */}
-        <div className="lg:col-span-7 space-y-6 order-1 lg:order-2 sticky top-20">
+        <div className="lg:col-span-7 space-y-5 sm:space-y-6 order-1 lg:order-2 lg:sticky lg:top-20">
           <div
             ref={videoContainerRef}
-            className="bg-slate-900/90 rounded-3xl border border-slate-800 p-4 sm:p-5 shadow-xl space-y-4 relative backdrop-blur-xl"
+            className="bg-slate-900/90 rounded-3xl border border-slate-800 p-3 sm:p-5 shadow-xl space-y-4 relative backdrop-blur-xl animate-content-in"
           >
             {/* Header */}
             <div className="flex items-center justify-between">
@@ -412,7 +413,7 @@ export const SearchPlayground: React.FC = () => {
             </div>
 
             {/* Video Canvas Box */}
-            <div className="aspect-video bg-slate-950 rounded-2xl border border-slate-800 relative overflow-hidden flex flex-col justify-between p-4 shadow-inner">
+            <div className="aspect-[9/16] sm:aspect-video bg-slate-950 rounded-2xl border border-slate-800 relative overflow-hidden flex flex-col justify-between p-3 sm:p-4 shadow-inner transition-all duration-500">
               <video
                 ref={videoRef}
                 key={selectedMatch.videoUrl || selectedMatch.videoId}
@@ -504,7 +505,7 @@ export const SearchPlayground: React.FC = () => {
                       onMouseLeave={() => setHoveredRadarBlock(null)}
                       onTouchStart={() => setHoveredRadarBlock(pt)}
                       title={`${pt.label} | MaxSim: ${(pt.score * 100).toFixed(1)}%`}
-                      className={`flex-1 rounded-[4px] transition-all cursor-pointer relative ${
+                      className={`flex-1 rounded-[4px] transition-all duration-300 cursor-pointer relative hover:-translate-y-0.5 ${
                         style.bgClass
                       } ${style.glowClass} ${
                         isCurrentTimeNear

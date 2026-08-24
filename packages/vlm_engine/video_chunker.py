@@ -3,14 +3,24 @@ Video Chunker for VLM Engine
 Reads raw .mp4 files and intelligently slices them into processable chunks.
 """
 
+import logging
 import os
 
-import decord
 import torch
-from decord import VideoReader, cpu
 
-# Configure decord to output PyTorch tensors natively for zero-copy speed
-decord.bridge.set_bridge('torch')
+try:
+    import decord
+    from decord import VideoReader, cpu
+
+    decord.bridge.set_bridge("torch")
+    _HAS_DECORD = True
+except (ImportError, Exception):
+    _HAS_DECORD = False
+    VideoReader = None  # type: ignore
+    cpu = None  # type: ignore
+
+logger = logging.getLogger(__name__)
+
 
 class VideoChunker:
     def __init__(self, fps_target: float = 2.0, chunk_duration_sec: float = 2.0):
@@ -23,6 +33,10 @@ class VideoChunker:
         self.chunk_duration_sec = chunk_duration_sec
         self.frames_per_chunk = int(fps_target * chunk_duration_sec)
 
+    def process(self, video_path: str) -> torch.Tensor:
+        """Alias for process_video to maintain backward compatibility."""
+        return self.process_video(video_path)
+
     def process_video(self, video_path: str) -> torch.Tensor:
         """
         Uses a sliding window approach to extract chunks.
@@ -30,6 +44,10 @@ class VideoChunker:
         """
         if not os.path.exists(video_path):
             raise FileNotFoundError(f"Video file not found: {video_path}")
+
+        if not _HAS_DECORD or VideoReader is None:
+            logger.warning("Decord is not available in current environment. Returning empty tensor.")
+            return torch.empty((0, self.frames_per_chunk, 3, 224, 224))
 
         # Use decord for fast, direct-to-tensor video decoding
         vr = VideoReader(video_path, ctx=cpu(0))
@@ -57,19 +75,16 @@ class VideoChunker:
 
         if num_complete_chunks > 0:
             # Truncate trailing frames that don't make a full chunk for simplicity
-            chunked_tensors = frames[:num_complete_chunks * self.frames_per_chunk]
+            chunked_tensors = frames[: num_complete_chunks * self.frames_per_chunk]
             chunked_tensors = chunked_tensors.view(
-                num_complete_chunks,
-                self.frames_per_chunk,
-                frames.shape[1],
-                frames.shape[2],
-                frames.shape[3]
+                num_complete_chunks, self.frames_per_chunk, frames.shape[1], frames.shape[2], frames.shape[3]
             )
         else:
             # Fallback if video is too short
             chunked_tensors = torch.empty((0, self.frames_per_chunk, frames.shape[1], frames.shape[2], frames.shape[3]))
 
         return chunked_tensors
+
 
 if __name__ == "__main__":
     print("VideoChunker initialized. Ready to process .mp4 files.")

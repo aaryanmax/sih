@@ -42,21 +42,19 @@ try:
         VectorParams,
     )
 except ImportError:
-    sys.exit(
-        "[ERROR] qdrant-client not installed.\n"
-        "  Run: pip install 'qdrant-client>=1.9.0'"
-    )
+    sys.exit("[ERROR] qdrant-client not installed.\n  Run: pip install 'qdrant-client>=1.9.0'")
 
 # -- constants -----------------------------------------------------------------
-DATA_FILE       = Path(__file__).parent.parent / "data" / "qdrant_payload_500.json"
+DATA_FILE = Path(__file__).parent.parent / "data" / "qdrant_payload_500.json"
 COLLECTION_NAME = "video_chunks"
-VECTOR_NAME     = "visual_patches"
-VECTOR_DIM      = 128
-QDRANT_HOST     = "localhost"
-QDRANT_PORT     = 6333
+VECTOR_NAME = "visual_patches"
+VECTOR_DIM = 128
+QDRANT_HOST = "localhost"
+QDRANT_PORT = 6333
 
 
 # -- helpers -------------------------------------------------------------------
+
 
 def build_client(host: str, port: int) -> QdrantClient:
     """
@@ -70,7 +68,7 @@ def build_client(host: str, port: int) -> QdrantClient:
     return QdrantClient(
         host=host,
         port=port,
-        prefer_grpc=False,          # ← key fix: force HTTP REST
+        prefer_grpc=False,  # ← key fix: force HTTP REST
         timeout=120,
         check_compatibility=False,
     )
@@ -103,7 +101,7 @@ def ensure_collection(client: QdrantClient, recreate: bool) -> bool:
         else:
             count = client.count(COLLECTION_NAME).count
             print(f"[OK] Collection '{COLLECTION_NAME}' exists — {count:,} points.")
-            return count == 0   # need to upload only if empty
+            return count == 0  # need to upload only if empty
 
     print(f"[+] Creating collection '{COLLECTION_NAME}' …")
     client.create_collection(
@@ -111,18 +109,15 @@ def ensure_collection(client: QdrantClient, recreate: bool) -> bool:
         vectors_config={
             VECTOR_NAME: VectorParams(
                 size=VECTOR_DIM,
-                distance=Distance.DOT,          # MaxSim uses dot-product internally
+                distance=Distance.DOT,  # MaxSim uses dot-product internally
                 multivector_config=MultiVectorConfig(
                     comparator=MultiVectorComparator.MAX_SIM,
                 ),
             )
         },
     )
-    print(
-        f"[OK] Collection created: name={COLLECTION_NAME}, "
-        f"vector={VECTOR_NAME}, dim={VECTOR_DIM}, comparator=MaxSim"
-    )
-    return True   # fresh — need upload
+    print(f"[OK] Collection created: name={COLLECTION_NAME}, vector={VECTOR_NAME}, dim={VECTOR_DIM}, comparator=MaxSim")
+    return True  # fresh — need upload
 
 
 def build_point(idx: int, record: dict) -> PointStruct:
@@ -138,13 +133,13 @@ def build_point(idx: int, record: dict) -> PointStruct:
 
 def seed(client: QdrantClient, data: list, batch_size: int) -> None:
     """Upload all records in batches with a live progress display."""
-    total   = len(data)
-    done    = 0
-    start   = time.time()
+    total = len(data)
+    done = 0
+    start = time.time()
 
     for batch_start in range(0, total, batch_size):
-        batch   = data[batch_start: batch_start + batch_size]
-        points  = [build_point(batch_start + i, rec) for i, rec in enumerate(batch)]
+        batch = data[batch_start : batch_start + batch_size]
+        points = [build_point(batch_start + i, rec) for i, rec in enumerate(batch)]
 
         # Retry once on transient errors
         for attempt in range(2):
@@ -165,23 +160,22 @@ def seed(client: QdrantClient, data: list, batch_size: int) -> None:
 
         done += len(points)
         elapsed = time.time() - start
-        pct     = done / total * 100
-        rate    = done / elapsed if elapsed > 0 else 0
-        eta     = (total - done) / rate if rate > 0 else 0
+        pct = done / total * 100
+        rate = done / elapsed if elapsed > 0 else 0
+        eta = (total - done) / rate if rate > 0 else 0
 
         print(
-            f"\r  [{done:>4}/{total}] {pct:5.1f}%  "
-            f"({rate:.1f} pts/s  ETA {eta:.0f}s)    ",
+            f"\r  [{done:>4}/{total}] {pct:5.1f}%  ({rate:.1f} pts/s  ETA {eta:.0f}s)    ",
             end="",
             flush=True,
         )
 
-    print()   # newline after progress bar
+    print()  # newline after progress bar
 
 
 def verify(client: QdrantClient) -> None:
     """Print a health summary of the seeded collection."""
-    info  = client.get_collection(COLLECTION_NAME)
+    info = client.get_collection(COLLECTION_NAME)
     count = client.count(COLLECTION_NAME).count
     print("\n--- Verification -------------------------------------------")
     print(f"  Collection   : {COLLECTION_NAME}")
@@ -203,14 +197,18 @@ def verify(client: QdrantClient) -> None:
 
 # -- entry point ---------------------------------------------------------------
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Seed local Qdrant with video_chunks data.")
     parser.add_argument(
-        "--batch-size", type=int, default=8,
+        "--batch-size",
+        type=int,
+        default=8,
         help="Points per upsert batch (default: 8). Keep ≤ 20 to stay under HTTP limits.",
     )
     parser.add_argument(
-        "--recreate", action="store_true",
+        "--recreate",
+        action="store_true",
         help="Drop and recreate the collection before seeding.",
     )
     parser.add_argument("--host", default=QDRANT_HOST)
@@ -233,10 +231,7 @@ def main() -> None:
         sys.exit("[ERROR] 'visual_multi_vector' key missing from first record.")
     actual_dim = len(sample_mv[0])
     if actual_dim != VECTOR_DIM:
-        print(
-            f"[WARN] Expected dim={VECTOR_DIM} but found dim={actual_dim}. "
-            "Adjust VECTOR_DIM constant if needed."
-        )
+        print(f"[WARN] Expected dim={VECTOR_DIM} but found dim={actual_dim}. Adjust VECTOR_DIM constant if needed.")
     print(f"       patches/frame={len(sample_mv)}, dim={actual_dim}")
 
     # -- connect & seed --------------------------------------------------------

@@ -34,9 +34,19 @@ ingest:
 
 index-batch:
 	@echo "Running local batch indexer script..."
-	PYTHONPATH=$(pwd) python packages/pipeline/batch_indexer.py
+	python -m packages.pipeline.batch_indexer
+
+test:
+	@echo "Running backend pytest suite..."
+	pytest tests/ -v
+
+lint:
+	@echo "Running linters..."
+	ruff check apps/api packages/ scripts/
+	black --check apps/api packages/ scripts/
+	cd apps/web && npm run lint
 
 clean:
 	@echo "Cleaning up containers and volumes..."
 	docker compose down -v
-	find . -type d -name __pycache__ -exec rm -r {} +
+	find . -type d -name __pycache__ -exec rm -r {} + 2>/dev/null || true

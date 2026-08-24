@@ -27,6 +27,7 @@ from typing import List, Optional
 
 try:
     import torch
+
     _DTYPE = torch.bfloat16
 except ImportError:
     torch = None
@@ -38,8 +39,8 @@ logger = logging.getLogger(__name__)
 # Module-level singleton storage (thread-safe via a lock)
 # ---------------------------------------------------------------------------
 _model_lock = threading.Lock()
-_model: Optional[object] = None          # ColQwen2
-_processor: Optional[object] = None     # ColQwen2Processor
+_model: Optional[object] = None  # ColQwen2
+_processor: Optional[object] = None  # ColQwen2Processor
 _MODEL_NAME: str = os.getenv("COLQWEN_MODEL", "vidore/colqwen2-v1.0")
 _DEVICE: str = "cpu"
 
@@ -47,6 +48,7 @@ _DEVICE: str = "cpu"
 # ---------------------------------------------------------------------------
 # Lazy loader — called once, result cached in module globals
 # ---------------------------------------------------------------------------
+
 
 def _load_model() -> None:
     """Load ColQwen2/ColPali model and processor into module-level singletons with fallback."""
@@ -60,34 +62,42 @@ def _load_model() -> None:
         # 1. Apply compatibility patches for transformers/peft/huggingface_hub
         try:
             import transformers.utils.auto_docstring
-            transformers.utils.auto_docstring.auto_docstring = lambda *args, **kwargs: (lambda obj: obj)
+
+            transformers.utils.auto_docstring.auto_docstring = lambda *args, **kwargs: lambda obj: obj
         except Exception:
             pass
 
         try:
             import huggingface_hub.dataclasses
+
             huggingface_hub.dataclasses.strict = lambda cls=None, **kwargs: (lambda c: c) if cls is None else cls
         except Exception:
             pass
 
         try:
             import peft.import_utils
+
             peft.import_utils.is_torchao_available = lambda: False
         except Exception:
             pass
 
         try:
             from colpali_engine.models import ColQwen2, ColQwen2Processor  # type: ignore
+
+            hf_token = os.getenv("HF_TOKEN") or os.getenv("HUGGING_FACE_HUB_TOKEN")
             logger.info(
                 "Loading ColQwen2 model '%s' on %s with dtype=%s …",
-                _MODEL_NAME, _DEVICE, _DTYPE,
+                _MODEL_NAME,
+                _DEVICE,
+                _DTYPE,
             )
-            _processor = ColQwen2Processor.from_pretrained(_MODEL_NAME)
+            _processor = ColQwen2Processor.from_pretrained(_MODEL_NAME, token=hf_token)
             _model = ColQwen2.from_pretrained(
                 _MODEL_NAME,
                 torch_dtype=_DTYPE,
                 device_map=_DEVICE,
                 low_cpu_mem_usage=True,
+                token=hf_token,
             )
             _model.eval()
             logger.info("ColQwen2 model loaded successfully (singleton ready).")
@@ -96,7 +106,8 @@ def _load_model() -> None:
             logger.warning(
                 "Could not load full ColQwen2 checkpoint '%s' (%s). "
                 "Activating lightweight multi-vector query projection.",
-                _MODEL_NAME, exc,
+                _MODEL_NAME,
+                exc,
             )
             _model = "lightweight_projection"
             _processor = None
@@ -105,6 +116,7 @@ def _load_model() -> None:
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def encode_query(query: str) -> List[List[float]]:
     """
@@ -122,11 +134,13 @@ def encode_query(query: str) -> List[List[float]]:
         128-dim embedding — identical projection space to the visual patch
         vectors stored in Qdrant.
     """
-    _load_model()   # no-op after first call
+    _load_model()  # no-op after first call
 
     if _model == "lightweight_projection" or _processor is None:
         import hashlib
+
         import numpy as np
+
         words = query.strip().split() or ["query"]
         token_vectors = []
         for word in words:
@@ -144,8 +158,7 @@ def encode_query(query: str) -> List[List[float]]:
 
     inputs = _processor.process_queries([query])
     # Move each tensor to the target device / dtype
-    inputs = {k: v.to(device=_DEVICE, dtype=_DTYPE if v.is_floating_point() else v.dtype)
-              for k, v in inputs.items()}
+    inputs = {k: v.to(device=_DEVICE, dtype=_DTYPE if v.is_floating_point() else v.dtype) for k, v in inputs.items()}
 
     with torch.no_grad():
         embeddings = _model(**inputs)  # Tensor[1, num_tokens, 128]
@@ -159,6 +172,7 @@ def encode_query(query: str) -> List[List[float]]:
 # ---------------------------------------------------------------------------
 # Convenience wrapper kept for backward-compat with HybridRetriever
 # ---------------------------------------------------------------------------
+
 
 class QueryEncoder:
     """
@@ -194,10 +208,10 @@ if __name__ == "__main__":
     t0 = time.perf_counter()
     vecs = encode_query(sample)
     t1 = time.perf_counter()
-    print(f"  → {len(vecs)} tokens × {len(vecs[0])} dims  ({(t1-t0)*1000:.0f} ms)")
+    print(f"  → {len(vecs)} tokens × {len(vecs[0])} dims  ({(t1 - t0) * 1000:.0f} ms)")
 
     # Second call — should be instant (model already cached)
     t2 = time.perf_counter()
     encode_query("second query to test singleton")
     t3 = time.perf_counter()
-    print(f"  Cached call: {(t3-t2)*1000:.0f} ms  (expect <200 ms)")
+    print(f"  Cached call: {(t3 - t2) * 1000:.0f} ms  (expect <200 ms)")

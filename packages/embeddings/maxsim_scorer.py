@@ -45,10 +45,8 @@ class MaxSimRetriever:
                     size=vector_dim,
                     distance=models.Distance.COSINE,
                     # Crucial implementation strategy: Qdrant handles MaxSim natively
-                    multivector_config=models.MultiVectorConfig(
-                        comparator=models.MultiVectorComparator.MAX_SIM
-                    )
-                )
+                    multivector_config=models.MultiVectorConfig(comparator=models.MultiVectorComparator.MAX_SIM),
+                ),
             )
             print("Schema initialized successfully.")
         else:
@@ -59,15 +57,12 @@ class MaxSimRetriever:
         Inserts multivector points (visual patch tokens) into Qdrant.
         """
         if self.client:
-            self.client.upsert(
-                collection_name=self.collection_name,
-                points=points
-            )
+            self.client.upsert(collection_name=self.collection_name, points=points)
 
     def search(self, query_multi_vector: np.ndarray, top_k: int = 10) -> List[Any]:
         """
         Executes a Late-Interaction MaxSim search against the stored patch tokens.
-        
+
         :param query_multi_vector: Embedded query text tokens (Num_Tokens, Projection_Dim)
         :param top_k: Number of results to return
         :return: Ranked list of search results
@@ -79,12 +74,10 @@ class MaxSimRetriever:
         query_list = query_multi_vector.tolist()
 
         search_result = self.client.search(
-            collection_name=self.collection_name,
-            query_vector=query_list,
-            limit=top_k,
-            with_payload=True
+            collection_name=self.collection_name, query_vector=query_list, limit=top_k, with_payload=True
         )
         return search_result
+
 
 if __name__ == "__main__":
     retriever = MaxSimRetriever()

@@ -30,17 +30,18 @@ engine_args = AsyncEngineArgs(
     gpu_memory_utilization=GPU_MEM_UTILIZATION,
     max_model_len=MAX_MODEL_LEN,
     tensor_parallel_size=1,
-    enforce_eager=True # Required for some multimodal hidden state access modes
+    enforce_eager=True,  # Required for some multimodal hidden state access modes
 )
 
 # In a real environment with GPUs, we initialize the engine:
 # engine = AsyncLLMEngine.from_engine_args(engine_args)
 
+
 def extract_patch_tokens_internal(chunked_tensors: torch.Tensor) -> torch.Tensor:
     """
     Internal Python function that accepts video tensors from video_chunker.py
     and returns the hidden states (patch tokens).
-    
+
     :param chunked_tensors: Tensor of shape (Num_Chunks, Frames_per_Chunk, C, H, W)
     :return: Tensor of hidden states (patch tokens)
     """
@@ -54,16 +55,18 @@ def extract_patch_tokens_internal(chunked_tensors: torch.Tensor) -> torch.Tensor
     # Assume Qwen2-VL-7B uses a hidden dimension of 4096
     hidden_dim = 4096
     num_chunks = chunked_tensors.shape[0]
-    patches_per_chunk = 256 # Example downsampled patch count
+    patches_per_chunk = 256  # Example downsampled patch count
 
     # Shape: (Num_Chunks, Patches_per_Chunk, Hidden_Dim)
-    hidden_states = torch.randn((num_chunks, patches_per_chunk, hidden_dim), device='cpu')
+    hidden_states = torch.randn((num_chunks, patches_per_chunk, hidden_dim), device="cpu")
     return hidden_states
+
 
 class TensorRequest(BaseModel):
     video_path: str
     fps_target: float = 2.0
     chunk_duration_sec: float = 2.0
+
 
 @app.post("/extract_patches")
 async def extract_patches_endpoint(request: TensorRequest):
@@ -86,10 +89,11 @@ async def extract_patches_endpoint(request: TensorRequest):
             "status": "success",
             "video_path": request.video_path,
             "hidden_states_shape": list(hidden_states.shape),
-            "message": "Successfully extracted chronologically structured patch tokens."
+            "message": "Successfully extracted chronologically structured patch tokens.",
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8001)

@@ -16,6 +16,7 @@ data/extracted_frames/
 data/audio_chunks/
 /qdrant_storage/
 qdrant_storage/
+.qdrant_data/
 *.mp4
 *.avi
 *.mkv

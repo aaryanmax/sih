@@ -1,8 +1,9 @@
 import logging
 from typing import List, Optional
 
-from packages.retrieval.late_interaction import LateInteractionRetriever, SceneResult
 from packages.embeddings.query_encoder import encode_query
+from packages.retrieval.late_interaction import LateInteractionRetriever, SceneResult
+
 from .backend import VideoSearchBackend
 
 logger = logging.getLogger(__name__)

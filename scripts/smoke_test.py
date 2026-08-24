@@ -44,10 +44,13 @@ def print_step(step_num: int, title: str):
 def test_config():
     print_step(1, "Testing Centralized Configuration")
     from apps.api.config import get_settings
+
     settings = get_settings()
     print(f"  * Qdrant Collection : {settings.QDRANT_COLLECTION}")
     print(f"  * Qdrant Host:Port  : {settings.QDRANT_HOST}:{settings.QDRANT_PORT}")
-    print(f"  * Modality Weights  : Visual={settings.WEIGHT_VISUAL}, Whisper={settings.WEIGHT_WHISPER}, OCR={settings.WEIGHT_OCR}")
+    print(
+        f"  * Modality Weights  : Visual={settings.WEIGHT_VISUAL}, Whisper={settings.WEIGHT_WHISPER}, OCR={settings.WEIGHT_OCR}"
+    )
     print(f"  * Gemini Timeout    : {settings.EXPLAINABILITY_TIMEOUT_S}s")
     assert settings.QDRANT_COLLECTION is not None
     assert round(settings.WEIGHT_VISUAL + settings.WEIGHT_WHISPER + settings.WEIGHT_OCR, 2) == 1.0
@@ -62,12 +65,15 @@ def test_query_encoder(fast_mode: bool = False):
 
     try:
         from packages.embeddings.query_encoder import encode_query
+
         t0 = time.perf_counter()
         query = "drone tracking red vehicle"
         vectors = encode_query(query)
         elapsed = (time.perf_counter() - t0) * 1000
         print(f"  * Query: '{query}'")
-        print(f"  * Encoded Tokens: {len(vectors)} multi-vectors [dim={len(vectors[0]) if vectors else 0}] ({elapsed:.1f}ms)")
+        print(
+            f"  * Encoded Tokens: {len(vectors)} multi-vectors [dim={len(vectors[0]) if vectors else 0}] ({elapsed:.1f}ms)"
+        )
         assert len(vectors) > 0, "Encoder returned empty vector list"
     except Exception as exc:
         print(f"  ! Query encoder notice/skip: {exc}")
@@ -76,11 +82,11 @@ def test_query_encoder(fast_mode: bool = False):
 def test_multi_search_pipeline():
     print_step(3, "Testing Multi-Intent Search Pipeline & Ranking")
     from packages.multi_search import (
-        MultiSearchPlanner,
-        MultiIntentEngine,
-        MockVideoSearchBackend,
-        rank_results,
         ALLOWED_INTENTS,
+        MockVideoSearchBackend,
+        MultiIntentEngine,
+        MultiSearchPlanner,
+        rank_results,
     )
     from packages.retrieval.late_interaction import SceneResult
 
@@ -104,13 +110,16 @@ def test_multi_search_pipeline():
     print(f"  * Topic Identified  : '{res.topic}'")
     print(f"  * Intent Stages ({len(res.intents)}):")
     for intent_group in res.intents:
-        print(f"     - [{intent_group.intent.upper()}] {intent_group.objective[:60]}... ({len(intent_group.results)} scenes)")
+        print(
+            f"     - [{intent_group.intent.upper()}] {intent_group.objective[:60]}... ({len(intent_group.results)} scenes)"
+        )
     assert len(res.intents) >= 2, "MultiIntentEngine returned insufficient intents"
 
 
 def test_fastapi_endpoints():
     print_step(4, "Testing FastAPI Endpoints via TestClient")
     from fastapi.testclient import TestClient
+
     from apps.api.main import app
 
     client = TestClient(app)
@@ -138,8 +147,12 @@ def test_fastapi_endpoints():
 
     if data.get("intents") and data["intents"][0].get("results"):
         first_hit = data["intents"][0]["results"][0]
-        print(f"     - Sample Hit: video='{first_hit.get('video_id')}' [{first_hit.get('start_time')}s-{first_hit.get('end_time')}s]")
-        print(f"       Scores: Fused={first_hit.get('score')}, Visual={first_hit.get('visual_score')}, Whisper={first_hit.get('whisper_score')}, OCR={first_hit.get('ocr_score')}")
+        print(
+            f"     - Sample Hit: video='{first_hit.get('video_id')}' [{first_hit.get('start_time')}s-{first_hit.get('end_time')}s]"
+        )
+        print(
+            f"       Scores: Fused={first_hit.get('score')}, Visual={first_hit.get('visual_score')}, Whisper={first_hit.get('whisper_score')}, OCR={first_hit.get('ocr_score')}"
+        )
 
 
 def main():

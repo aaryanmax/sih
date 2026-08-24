@@ -694,7 +694,7 @@ export const SearchPlayground: React.FC = () => {
       </section>
 
       {/* ── 2. MAIN INTERACTIVE GRID ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 items-start">
         {/* ── Left Column: Ranked Search Results List ── */}
         <div className="lg:col-span-5 space-y-3 order-2 lg:order-1">
           <div className="flex items-center justify-between px-1">
@@ -717,10 +717,11 @@ export const SearchPlayground: React.FC = () => {
                 <div
                   key={match.id}
                   onClick={() => handleSelectMatch(match)}
-                  className={`p-4 rounded-3xl border transition-all cursor-pointer relative overflow-hidden group ${
+                  style={{ animationDelay: `${filteredMatches.indexOf(match) * 80}ms` }}
+                  className={`p-4 rounded-3xl border transition-all duration-500 ease-out cursor-pointer relative overflow-hidden group animate-slide-up hover:-translate-y-1 hover:scale-[1.01] hover:shadow-[0_12px_35px_rgba(79,70,229,0.16)] ${
                     isSelected
-                      ? "bg-slate-900/95 border-indigo-500 ring-2 ring-indigo-500/40 shadow-xl shadow-indigo-500/10"
-                      : "bg-slate-900/60 border-slate-800/80 hover:border-slate-700 hover:bg-slate-900/80"
+                      ? "bg-slate-900/95 border-indigo-500 ring-2 ring-indigo-500/40 shadow-xl shadow-indigo-500/10 scale-[1.01]"
+                      : "bg-slate-900/60 border-slate-800/80 hover:border-indigo-500/50 hover:bg-slate-900/80"
                   }`}
                 >
                   {/* Top status line */}
@@ -743,7 +744,7 @@ export const SearchPlayground: React.FC = () => {
                         e.stopPropagation();
                         handleSelectMatch(match);
                       }}
-                      className={`p-2 rounded-xl transition-all shrink-0 ${
+                      className={`p-2 rounded-xl transition-all shrink-0 active:scale-95 ${
                         isSelected
                           ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30"
                           : "bg-slate-800 text-slate-300 group-hover:bg-indigo-600 group-hover:text-white"
@@ -788,11 +789,11 @@ export const SearchPlayground: React.FC = () => {
         </div>
 
         {/* ── Right Column: Video Player, Semantic Radar & Inspector ── */}
-        <div className="lg:col-span-7 space-y-6 order-1 lg:order-2 sticky top-20">
+        <div className="lg:col-span-7 space-y-5 sm:space-y-6 order-1 lg:order-2 lg:sticky lg:top-20">
           {/* Synchronized Player Box */}
           <div
             ref={videoContainerRef}
-            className="bg-slate-900/90 dark:bg-slate-950/90 rounded-3xl border border-slate-800/80 p-4 sm:p-5 shadow-2xl backdrop-blur-2xl space-y-4 relative"
+            className="bg-slate-900/90 dark:bg-slate-950/90 rounded-3xl border border-slate-800/80 p-3 sm:p-5 shadow-2xl backdrop-blur-2xl space-y-4 relative animate-content-in"
           >
             {/* Header */}
             <div className="flex items-center justify-between">
@@ -823,7 +824,7 @@ export const SearchPlayground: React.FC = () => {
             </div>
 
             {/* ── HTML5 Video Canvas Container ── */}
-            <div className="relative aspect-video bg-black rounded-2xl border border-slate-800 overflow-hidden group shadow-inner">
+            <div className="relative aspect-[9/16] sm:aspect-video bg-black rounded-2xl border border-slate-800 overflow-hidden group shadow-inner transition-all duration-500">
               <video
                 ref={videoRef}
                 key={selectedMatch.videoUrl}
@@ -865,7 +866,7 @@ export const SearchPlayground: React.FC = () => {
               {!isPlaying && !videoError && (
                 <button
                   onClick={togglePlay}
-                  className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-xs transition-opacity"
+                  className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-xs transition-opacity cursor-pointer"
                   aria-label="Play Video"
                 >
                   <div className="w-16 h-16 rounded-full bg-indigo-600/90 hover:bg-indigo-500 text-white flex items-center justify-center shadow-2xl shadow-indigo-600/50 transform group-hover:scale-110 transition-transform">
@@ -950,7 +951,7 @@ export const SearchPlayground: React.FC = () => {
                       onMouseLeave={() => setHoveredRadarBlock(null)}
                       onTouchStart={() => setHoveredRadarBlock(point)}
                       title={`${point.label} | MaxSim: ${(point.score * 100).toFixed(1)}%`}
-                      className={`flex-1 rounded-[4px] transition-all cursor-pointer relative group ${
+                      className={`flex-1 rounded-[4px] transition-all duration-300 cursor-pointer relative hover:-translate-y-0.5 ${
                         style.bgClass
                       } ${style.glowClass} ${
                         isCurrentTimeNear

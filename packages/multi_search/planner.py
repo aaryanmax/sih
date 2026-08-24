@@ -6,8 +6,8 @@ from typing import List, Optional
 
 from google import genai
 
-from .schemas import SearchIntent, MultiSearchPlan
 from .prompts import ALLOWED_INTENTS, PLANNER_SYSTEM_PROMPT
+from .schemas import MultiSearchPlan, SearchIntent
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ class MultiSearchPlanner:
         else:
             self.client = genai.Client(api_key=self.api_key)
 
-        self.model = model or os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+        self.model = model or os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 
     def plan(self, user_query: str) -> MultiSearchPlan:
         """
@@ -98,13 +98,26 @@ Return JSON in exactly this structure:
     ]
 }}
 """
-        response = self.client.models.generate_content(
-            model=self.model,
-            contents=prompt,
-            config={
-                "response_mime_type": "application/json",
-            },
-        )
+        models_to_try = [self.model, "gemini-3.1-flash-lite"] if self.model == "gemini-3.5-flash-lite" else [self.model]
+
+        last_err = None
+        response = None
+        for model_id in models_to_try:
+            try:
+                response = self.client.models.generate_content(
+                    model=model_id,
+                    contents=prompt,
+                    config={
+                        "response_mime_type": "application/json",
+                    },
+                )
+                break
+            except Exception as e:
+                last_err = e
+                logger.warning("Model %s failed: %s", model_id, e)
+                
+        if response is None and last_err:
+            raise last_err
 
         text = (response.text or "").strip()
 

@@ -1,6 +1,7 @@
 from typing import List
 
 from packages.retrieval.late_interaction import SceneResult
+
 from .backend import VideoSearchBackend
 
 

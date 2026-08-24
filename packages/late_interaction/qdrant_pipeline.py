@@ -31,8 +31,6 @@ class VideoVectorStore:
                 vectors_config=models.VectorParams(
                     size=vector_dim,
                     distance=models.Distance.COSINE,
-                    multivector_config=models.MultiVectorConfig(
-                        comparator=models.MultiVectorComparator.MAX_SIM
-                    )
-                )
+                    multivector_config=models.MultiVectorConfig(comparator=models.MultiVectorComparator.MAX_SIM),
+                ),
             )

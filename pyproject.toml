@@ -1,11 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chronovision-ai"
+version = "1.0.0"
+description = "Deep Multimodal Semantic Video Intelligence & Late-Interaction Retrieval Platform"
+readme = "README.md"
+requires-python = ">=3.14"
+authors = [{ name = "SIH ChronoVision Team" }]
+
 [tool.ruff]
 line-length = 120
-target-version = "py311"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]
 ignore = [
-    "E402",  # module level import not at top of file (sys.path manipulation for local packages)
+    "E402",  # module level import not at top of file
     "E501",  # line too long (handled by black)
     "F401",  # unused imports in stubs / init
     "F841",  # local variable unused in stubs
@@ -15,19 +27,25 @@ ignore = [
 
 [tool.black]
 line-length = 120
-target-version = ['py311']
+target-version = ['py314']
 
 [tool.pyright]
-include = ["packages", "apps", "scripts"]
+include = ["packages", "apps", "scripts", "tests"]
 extraPaths = [
     ".",
     "packages",
     "packages/multi_search",
     "packages/retrieval",
     "packages/embeddings",
-    "packages/audio-ocr",
-    "packages/vlm-engine",
-    "packages/vllm-inference",
+    "packages/audio_ocr",
+    "packages/vlm_engine",
+    "packages/vllm_inference",
     "packages/pipeline",
+    "packages/late_interaction",
     "apps/api"
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+pythonpath = [".", "packages", "apps/api"]

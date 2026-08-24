@@ -18,29 +18,46 @@ from routes.search import router as search_router
 app = FastAPI(
     title="SIH Advanced Video Search API",
     description="Multimodal search engine with ColPali Late-Interaction & Qwen-VL",
-    version="1.0.0"
+    version="1.0.0",
 )
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 app.include_router(search_router)
 
+
 @app.get("/health")
 @app.get("/api/health")
 async def health_check():
+    qdrant_status = False
+    collections_list = []
+    try:
+        from routes.search import _get_retriever
+
+        retriever = _get_retriever()
+        if retriever and retriever.client:
+            cols = retriever.client.get_collections().collections
+            collections_list = [c.name for c in cols]
+            qdrant_status = True
+    except Exception as exc:
+        qdrant_status = False
+
     return {
-        "status": "healthy",
+        "status": "healthy" if qdrant_status else "degraded",
         "service": "ChronoVision AI Video Search Backend",
-        "qdrant_connected": True,
-        "engine": "ColPali Late-Interaction MaxSim"
+        "qdrant_connected": qdrant_status,
+        "collections": collections_list,
+        "engine": "ColPali Late-Interaction MaxSim",
     }
+
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)

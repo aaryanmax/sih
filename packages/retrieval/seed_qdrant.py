@@ -33,11 +33,13 @@ VECTOR_NAME = os.getenv("QDRANT_VECTOR_NAME", "colqwen")
 VECTOR_DIM = 128
 BATCH_SIZE = 100
 
+
 def get_data_dir() -> Path:
     current = Path(__file__).resolve()
     # Go up from packages/retrieval/seed_qdrant.py to project root
     root = current.parents[2]
     return root / "data"
+
 
 def seed_qdrant(force_recreate: bool = False) -> int:
     data_dir = get_data_dir()
@@ -59,17 +61,16 @@ def seed_qdrant(force_recreate: bool = False) -> int:
             logger.info("Recreating collection '%s'...", COLLECTION_NAME)
             client.delete_collection(collection_name=COLLECTION_NAME)
 
-        logger.info("Creating collection '%s' with vector '%s' (dim=%d, MaxSim)...",
-                    COLLECTION_NAME, VECTOR_NAME, VECTOR_DIM)
+        logger.info(
+            "Creating collection '%s' with vector '%s' (dim=%d, MaxSim)...", COLLECTION_NAME, VECTOR_NAME, VECTOR_DIM
+        )
         client.create_collection(
             collection_name=COLLECTION_NAME,
             vectors_config={
                 VECTOR_NAME: VectorParams(
                     size=VECTOR_DIM,
                     distance=Distance.DOT,
-                    multivector_config=MultiVectorConfig(
-                        comparator=MultiVectorComparator.MAX_SIM
-                    ),
+                    multivector_config=MultiVectorConfig(comparator=MultiVectorComparator.MAX_SIM),
                 )
             },
         )
@@ -121,7 +122,12 @@ def seed_qdrant(force_recreate: bool = False) -> int:
                 points=points_buffer,
             )
             total_upserted += len(points_buffer)
-            logger.info("Upserted %d / %d points (%.1f%%)...", total_upserted, total_records, (total_upserted / total_records) * 100)
+            logger.info(
+                "Upserted %d / %d points (%.1f%%)...",
+                total_upserted,
+                total_records,
+                (total_upserted / total_records) * 100,
+            )
             points_buffer = []
 
     if points_buffer:
@@ -134,6 +140,7 @@ def seed_qdrant(force_recreate: bool = False) -> int:
     final_count = client.count(collection_name=COLLECTION_NAME).count
     logger.info("✅ Finished! Total points in collection '%s': %d", COLLECTION_NAME, final_count)
     return final_count
+
 
 if __name__ == "__main__":
     force = "--force" in sys.argv or "-f" in sys.argv

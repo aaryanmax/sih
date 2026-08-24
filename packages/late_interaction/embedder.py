@@ -13,6 +13,7 @@ class ColPaliEmbedder:
     Multi-vector embedder producing (L, D) matrices for text queries
     and (P, D) patch matrices for video keyframes.
     """
+
     def __init__(self, model_name: str = "vidore/colpali-v1.2"):
         self.model_name = model_name
         self.embedding_dim = 128

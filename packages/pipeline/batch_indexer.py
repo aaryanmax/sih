@@ -13,36 +13,40 @@ from typing import List
 
 import torch
 
-# Setup paths to import from hyphenated directories
+# Setup paths for monorepo package imports
 current_dir = os.path.dirname(__file__)
-packages_dir = os.path.abspath(os.path.join(current_dir, '..'))
+packages_dir = os.path.abspath(os.path.join(current_dir, ".."))
 
-sys.path.append(os.path.join(packages_dir, 'vlm-engine'))
-sys.path.append(os.path.join(packages_dir, 'embeddings'))
-sys.path.append(os.path.join(packages_dir, 'audio-ocr'))
+sys.path.append(packages_dir)
+sys.path.append(os.path.join(packages_dir, "vlm_engine"))
+sys.path.append(os.path.join(packages_dir, "embeddings"))
+sys.path.append(os.path.join(packages_dir, "audio_ocr"))
 
-from maxsim_scorer import MaxSimRetriever
-from ocr_processor import OCRProcessor
-from patch_encoder import PatchEncoder
 from qdrant_client.http import models
-from video_chunker import VideoChunker
-from whisper_processor import WhisperAudioProcessor
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+from packages.audio_ocr.ocr_processor import OCRProcessor
+from packages.audio_ocr.whisper_processor import WhisperAudioProcessor
+from packages.embeddings.maxsim_scorer import MaxSimRetriever
+from packages.embeddings.patch_encoder import PatchEncoder
+from packages.vlm_engine.video_chunker import VideoChunker
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("BatchIndexer")
 
+
 class BatchIndexer:
-    def __init__(self, video_dir: str = "./data/raw_videos"):
+    def __init__(self, video_dir: str = "./data/raw_videos", collection_name: str = "video_frames"):
         self.video_dir = video_dir
         self.chunk_duration_sec = 2.0
         self.fps_target = 2.0
+        self.collection_name = os.getenv("QDRANT_COLLECTION", collection_name)
 
         logger.info("Initializing Batch Ingestion Orchestrator...")
 
         # 1. Initialize core components
         self.chunker = VideoChunker(fps_target=self.fps_target, chunk_duration_sec=self.chunk_duration_sec)
         self.patch_encoder = PatchEncoder(projection_dim=128)
-        self.qdrant_retriever = MaxSimRetriever(collection_name="sih_video_keyframes")
+        self.qdrant_retriever = MaxSimRetriever(collection_name=self.collection_name)
 
         # Audio and OCR modules
         self.whisper = WhisperAudioProcessor(model_size="base")
@@ -65,7 +69,7 @@ class BatchIndexer:
         Interacts with the vLLM inference server to extract hidden states from the chunk.
         In a production deployment, this makes an HTTP request to http://vlm-engine:8001/internal/extract_embeddings
         or calls the loaded engine locally.
-        
+
         Returns: Tensor of shape (Batch, Num_Patches, Hidden_Dim) e.g., (1, 128, 4096)
         """
         # Simulated hidden states output for architectural completeness
@@ -96,7 +100,7 @@ class BatchIndexer:
         logger.info(f"Processing video: {video_filename} (ID: {video_id})")
 
         # 2. Extract chronological 2-second chunks using VideoChunker
-        chunks = self.chunker.process(video_path)
+        chunks = self.chunker.process_video(video_path)
         logger.info(f"Extracted {len(chunks)} chronological chunks.")
 
         # 3. Extract Whisper transcript segments (word-level/segment-level timestamps)
@@ -133,17 +137,13 @@ class BatchIndexer:
                 "end_time": end_time,
                 "transcript_text": window_transcript,
                 "ocr_text": ocr_result.full_text,
-                "keyframe_url": f"/assets/frames/{video_id}/frame_{idx:04d}.jpg"
+                "keyframe_url": f"/assets/frames/{video_id}/frame_{idx:04d}.jpg",
             }
 
             # Qdrant expects a list of lists for MultiVector payloads
             vector_payload = chunk_multi_vector.tolist()
 
-            point = models.PointStruct(
-                id=point_id,
-                vector=vector_payload,
-                payload=payload
-            )
+            point = models.PointStruct(id=point_id, vector=vector_payload, payload=payload)
             points_to_insert.append(point)
 
         # 9. Batch insert points into Qdrant for fast ingestion
@@ -151,6 +151,7 @@ class BatchIndexer:
             logger.info(f"Batch inserting {len(points_to_insert)} multi-vector points into Qdrant...")
             self.qdrant_retriever.insert_multi_vectors(points_to_insert)
             logger.info(f"Successfully ingested {video_filename} into Qdrant.")
+
 
 if __name__ == "__main__":
     indexer = BatchIndexer()

@@ -11,7 +11,7 @@ import numpy as np
 def compute_maxsim_score(query_embeddings: np.ndarray, doc_embeddings: np.ndarray) -> float:
     """
     Computes MaxSim score between Query Tokens (N_q, D) and Document/Frame Patches (N_d, D).
-    
+
     Formula:
         Score = sum_{q in Query} max_{d in Doc} (cosine_sim(q, d))
     """
@@ -29,7 +29,10 @@ def compute_maxsim_score(query_embeddings: np.ndarray, doc_embeddings: np.ndarra
     total_score = float(np.sum(max_sim_per_token))
     return total_score
 
-def get_token_patch_heatmap(query_tokens: List[str], query_embeddings: np.ndarray, doc_embeddings: np.ndarray) -> Dict[str, Any]:
+
+def get_token_patch_heatmap(
+    query_tokens: List[str], query_embeddings: np.ndarray, doc_embeddings: np.ndarray
+) -> Dict[str, Any]:
     """
     Generates token-to-patch attention maps for UI visual explainability.
     """
@@ -41,14 +44,13 @@ def get_token_patch_heatmap(query_tokens: List[str], query_embeddings: np.ndarra
     for idx, token in enumerate(query_tokens):
         best_patch_idx = int(np.argmax(similarity_matrix[idx]))
         score = float(similarity_matrix[idx, best_patch_idx])
-        alignments.append({
-            "token": token,
-            "best_patch_index": best_patch_idx,
-            "max_similarity": round(score, 4),
-            "patch_distribution": similarity_matrix[idx].tolist()[:16] # First 16 patches sample
-        })
+        alignments.append(
+            {
+                "token": token,
+                "best_patch_index": best_patch_idx,
+                "max_similarity": round(score, 4),
+                "patch_distribution": similarity_matrix[idx].tolist()[:16],  # First 16 patches sample
+            }
+        )
 
-    return {
-        "overall_score": float(np.sum(np.max(similarity_matrix, axis=1))),
-        "token_alignments": alignments
-    }
+    return {"overall_score": float(np.sum(np.max(similarity_matrix, axis=1))), "token_alignments": alignments}

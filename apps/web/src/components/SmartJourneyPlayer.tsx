@@ -693,21 +693,24 @@ export const SmartJourneyPlayer: React.FC = () => {
                 <div
                   key={step.id}
                   onClick={() => selectStep(idx)}
-                  className={`p-4 rounded-3xl border transition-all cursor-pointer relative z-10 flex items-start gap-3.5 ${isCurrent
-                      ? "bg-slate-900/95 border-indigo-500 ring-2 ring-indigo-500/40 shadow-xl shadow-indigo-500/10"
+                  style={{ animationDelay: `${idx * 80}ms` }}
+                  className={`p-4 rounded-3xl border transition-all duration-500 ease-out cursor-pointer relative z-10 flex items-start gap-3.5 animate-slide-up hover:-translate-y-1 hover:scale-[1.01] hover:shadow-[0_12px_35px_rgba(79,70,229,0.16)] ${
+                    isCurrent
+                      ? "bg-slate-900/95 border-indigo-500 ring-2 ring-indigo-500/40 shadow-xl shadow-indigo-500/10 scale-[1.01]"
                       : isPast
-                        ? "bg-slate-900/40 border-slate-800/60 opacity-80 hover:opacity-100"
-                        : "bg-slate-900/60 border-slate-800/80 hover:border-slate-700"
-                    }`}
+                      ? "bg-slate-900/40 border-slate-800/60 opacity-80 hover:opacity-100 hover:border-indigo-500/40"
+                      : "bg-slate-900/60 border-slate-800/80 hover:border-indigo-500/50"
+                  }`}
                 >
                   {/* Step Status Indicator Circle */}
                   <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-all ${isCurrent
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-all ${
+                      isCurrent
                         ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/40 ring-4 ring-indigo-500/20 scale-110"
                         : isPast
-                          ? "bg-emerald-950 border border-emerald-700 text-emerald-400"
-                          : "bg-slate-800 border border-slate-700 text-slate-400"
-                      }`}
+                        ? "bg-emerald-950 border border-emerald-700 text-emerald-400"
+                        : "bg-slate-800 border border-slate-700 text-slate-400"
+                    }`}
                   >
                     {isPast ? <Check className="w-4 h-4" /> : `0${step.stepNumber}`}
                   </div>

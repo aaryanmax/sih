@@ -83,6 +83,14 @@ export default function Home() {
                 <Search className="w-3.5 h-3.5" />
                 <span>Search Radar</span>
               </button>
+
+              <a
+                href="/reels"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-200 transition-all border border-transparent hover:border-slate-800"
+              >
+                <Radio className="w-3.5 h-3.5" />
+                <span>Mobile Reels</span>
+              </a>
             </div>
 
             {/* Live System Status Badges */}

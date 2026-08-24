@@ -15,6 +15,7 @@ class KeyframeMeta(BaseModel):
     image_path: str
     is_scene_cut: bool
 
+
 class VideoFrameSampler:
     def __init__(self, fps_sample_rate: float = 1.0, scene_threshold: float = 27.0):
         self.fps_sample_rate = fps_sample_rate
@@ -30,10 +31,5 @@ class VideoFrameSampler:
         for i in range(10):
             ts = round(i * 3.5, 2)
             frame_path = os.path.join(output_dir, f"frame_{i:04d}_{ts:.2f}s.jpg")
-            frames.append(KeyframeMeta(
-                frame_index=i,
-                timestamp_s=ts,
-                image_path=frame_path,
-                is_scene_cut=(i % 3 == 0)
-            ))
+            frames.append(KeyframeMeta(frame_index=i, timestamp_s=ts, image_path=frame_path, is_scene_cut=(i % 3 == 0)))
         return frames

@@ -21,7 +21,10 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+_ROOT = Path(__file__).resolve().parents[2]
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import ScoredPoint
@@ -34,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 COLLECTION_NAME: str = os.getenv("QDRANT_COLLECTION", "video_frames")
 VECTOR_NAME: str = os.getenv("QDRANT_VECTOR_NAME", "colqwen")
-MERGE_GAP_SECONDS: float = 4.0   # Adjacent chunks closer than this are merged
+MERGE_GAP_SECONDS: float = 4.0  # Adjacent chunks closer than this are merged
 VIDEO_URL_TEMPLATE: str = "/videos/{dataset}/{filename}"
 
 
@@ -42,24 +45,27 @@ VIDEO_URL_TEMPLATE: str = "/videos/{dataset}/{filename}"
 # Domain types
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class SceneResult:
     """A de-duplicated, time-bounded video scene matching the search query."""
+
     video_id: str
     video_filename: str
     video_url: str
     dataset_source: str
     start_time: float
     end_time: float
-    score: float                        # Normalised MaxSim confidence [0, 1]
+    score: float  # Normalised MaxSim confidence [0, 1]
     transcript_text: str = ""
     ocr_text: str = ""
-    chunk_ids: List[int] = field(default_factory=list)   # Contributing Qdrant point IDs
+    chunk_ids: List[int] = field(default_factory=list)  # Contributing Qdrant point IDs
 
 
 # ---------------------------------------------------------------------------
 # Retriever
 # ---------------------------------------------------------------------------
+
 
 class LateInteractionRetriever:
     """
@@ -97,11 +103,15 @@ class LateInteractionRetriever:
                 self.client = QdrantClient(path=local_data_path)
                 logger.info(
                     "LateInteractionRetriever connected to local embedded Qdrant at %s (collection=%s, vector=%s)",
-                    local_data_path, collection_name, vector_name,
+                    local_data_path,
+                    collection_name,
+                    vector_name,
                 )
                 return
             except Exception as e:
-                logger.warning("Could not open embedded Qdrant at %s (%s). Trying network client...", local_data_path, e)
+                logger.warning(
+                    "Could not open embedded Qdrant at %s (%s). Trying network client...", local_data_path, e
+                )
 
         # Fallback to network client
         host = qdrant_host or "localhost"
@@ -114,7 +124,10 @@ class LateInteractionRetriever:
         )
         logger.info(
             "LateInteractionRetriever connected to Qdrant server at %s:%s (collection=%s, vector=%s)",
-            host, qdrant_port, collection_name, vector_name,
+            host,
+            qdrant_port,
+            collection_name,
+            vector_name,
         )
 
     # ------------------------------------------------------------------
@@ -126,7 +139,7 @@ class LateInteractionRetriever:
         query_vectors: List[List[float]],
         top_k: int = 10,
         score_threshold: float = 0.0,
-        overfetch_factor: int = 5,
+        overfetch_factor: int = 30,
     ) -> List[SceneResult]:
         """
         Execute a MaxSim late-interaction query and return deduplicated scenes.
@@ -148,12 +161,12 @@ class LateInteractionRetriever:
         list[SceneResult]
             Top-K de-duplicated scenes, sorted descending by score.
         """
-        raw_limit = top_k * overfetch_factor
+        raw_limit = max(1000, top_k * overfetch_factor)
 
         try:
             results: List[ScoredPoint] = self.client.query_points(
                 collection_name=self.collection_name,
-                query=query_vectors,            # multi-vector: list[list[float]]
+                query=query_vectors,  # multi-vector: list[list[float]]
                 using=self.vector_name,
                 limit=raw_limit,
                 with_payload=True,
@@ -167,10 +180,12 @@ class LateInteractionRetriever:
 
         # Normalise scores to [0, 1] range
         max_score = max((r.score for r in results), default=1.0) or 1.0
-        scored = [
-            (r.payload or {}, r.score / max_score, r.id)
-            for r in results
-        ]
+
+        scored = []
+        for r in results:
+            p = r.payload or {}
+            norm_score = r.score / max_score
+            scored.append((p, norm_score, r.id))
 
         # Deduplicate and merge
         scenes = self._merge_chunks(scored, top_k)
@@ -197,6 +212,7 @@ class LateInteractionRetriever:
         """
         # Build per-video timelines
         from collections import defaultdict
+
         timeline: Dict[str, List[tuple]] = defaultdict(list)
 
         for payload, norm_score, point_id in scored_chunks:
@@ -225,22 +241,29 @@ class LateInteractionRetriever:
                 payload0 = current
                 filename = payload0.get("video_filename", f"{video_id}.avi")
                 dataset = payload0.get("dataset_source", "UCF101")
-                url = VIDEO_URL_TEMPLATE.format(
+
+                # Live ingested videos are saved to the 'shorts' directory
+                if dataset == "Live Ingest":
+                    dataset = "shorts"
+
+                url = payload0.get("video_url") or VIDEO_URL_TEMPLATE.format(
                     dataset=dataset,
                     filename=filename,
                 )
-                scenes.append(SceneResult(
-                    video_id=video_id,
-                    video_filename=filename,
-                    video_url=url,
-                    dataset_source=dataset,
-                    start_time=payload0.get("start_time", 0.0),
-                    end_time=cur_end,
-                    score=round(cur_score, 4),
-                    transcript_text=" … ".join(filter(None, cur_transcript)),
-                    ocr_text=" | ".join(filter(None, cur_ocr)),
-                    chunk_ids=list(cur_ids),
-                ))
+                scenes.append(
+                    SceneResult(
+                        video_id=video_id,
+                        video_filename=filename,
+                        video_url=url,
+                        dataset_source=dataset,
+                        start_time=payload0.get("start_time", 0.0),
+                        end_time=cur_end,
+                        score=round(cur_score, 4),
+                        transcript_text=" … ".join(filter(None, cur_transcript)),
+                        ocr_text=" | ".join(filter(None, cur_ocr)),
+                        chunk_ids=list(cur_ids),
+                    )
+                )
 
             for payload, norm_score, point_id in chunks:
                 start: float = payload.get("start_time", 0.0)
@@ -284,6 +307,7 @@ class LateInteractionRetriever:
 
 if __name__ == "__main__":
     import sys
+
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 
     query_text = " ".join(sys.argv[1:]) or "archery bullseye"
