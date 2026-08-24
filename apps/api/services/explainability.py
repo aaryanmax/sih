@@ -167,8 +167,10 @@ class ExplainabilityService:
         )
 
         async def _call_gemini() -> str:
-            models_to_try = [self.model, "gemini-3.1-flash-lite"] if self.model == "gemini-3.5-flash-lite" else [self.model]
-            
+            models_to_try = (
+                [self.model, "gemini-3.1-flash-lite"] if self.model == "gemini-3.5-flash-lite" else [self.model]
+            )
+
             last_err = None
             for model_id in models_to_try:
                 try:
@@ -191,7 +193,7 @@ class ExplainabilityService:
                 except Exception as e:
                     last_err = e
                     logger.warning("Model %s failed: %s", model_id, e)
-                    
+
             if last_err:
                 raise last_err
             return fallback

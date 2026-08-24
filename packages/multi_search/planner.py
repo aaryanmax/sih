@@ -115,7 +115,7 @@ Return JSON in exactly this structure:
             except Exception as e:
                 last_err = e
                 logger.warning("Model %s failed: %s", model_id, e)
-                
+
         if response is None and last_err:
             raise last_err
 

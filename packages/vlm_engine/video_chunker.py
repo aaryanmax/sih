@@ -14,7 +14,7 @@ try:
 
     decord.bridge.set_bridge("torch")
     _HAS_DECORD = True
-except (ImportError, Exception):
+except ImportError, Exception:
     _HAS_DECORD = False
     VideoReader = None  # type: ignore
     cpu = None  # type: ignore

@@ -117,7 +117,7 @@ def analyze_video_frames(
                         pass
 
                 models_to_try = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
-                
+
                 resp = None
                 last_err = None
                 for model_id in models_to_try:
@@ -134,7 +134,7 @@ def analyze_video_frames(
                     except Exception as e:
                         last_err = e
                         logger.warning("Model %s failed: %s", model_id, e)
-                        
+
                 if resp is None and last_err:
                     raise last_err
 
