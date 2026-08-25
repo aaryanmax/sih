@@ -140,7 +140,7 @@ class LateInteractionRetriever:
         self,
         query_vectors: List[List[float]],
         top_k: int = 10,
-        score_threshold: float = 0.0,
+        score_threshold: float = 0.10,
         overfetch_factor: int = 30,
     ) -> List[SceneResult]:
         """
@@ -153,7 +153,9 @@ class LateInteractionRetriever:
         top_k : int
             Number of scene results to return after deduplication.
         score_threshold : float
-            Minimum score to include in results.
+            Minimum *raw* Qdrant score to include.  The default of 0.10 filters
+            out low-confidence noise before the (paid) Groq relevance filter.
+            Set to 0.0 to disable pre-filtering.
         overfetch_factor : int
             Fetch top_k × overfetch_factor raw chunks before deduplication
             to ensure enough material for merging.
@@ -178,7 +180,7 @@ class LateInteractionRetriever:
             logger.error("Qdrant query_points failed: %s", exc, exc_info=True)
             return []
 
-        logger.debug("Raw Qdrant hits: %d (requested %d)", len(results), raw_limit)
+        logger.debug("Raw Qdrant hits: %d (requested %d, threshold=%.2f)", len(results), raw_limit, score_threshold)
 
         # Normalise scores to [0, 1] range
         max_score = max((r.score for r in results), default=1.0) or 1.0

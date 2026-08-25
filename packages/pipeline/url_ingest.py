@@ -100,7 +100,7 @@ def download_video(url: str, output_dir: Path, canonical_id: str) -> tuple[str, 
     video_title = "Short Video"
     try:
         title_res = subprocess.run(
-            [YT_DLP_PATH, url, "--print", "%(title)s", "--no-playlist"],
+            [YT_DLP_PATH, url, "--print", "%(title)s", "--no-playlist", "--extractor-args", "youtube:player_client=android,ios"],
             capture_output=True,
             text=True,
             timeout=10,
@@ -118,6 +118,8 @@ def download_video(url: str, output_dir: Path, canonical_id: str) -> tuple[str, 
         "-o",
         output_template,
         "--no-playlist",
+        "--extractor-args",
+        "youtube:player_client=android,ios",
     ]
 
     logger.info("Downloading short video '%s' (ID: %s) from %s...", video_title, canonical_id, url)
@@ -245,7 +247,7 @@ def download_and_process_url(url: str, client: Optional[QdrantClient] = None, fo
             video_title = canonical_id
             try:
                 title_res = subprocess.run(
-                    [YT_DLP_PATH, url, "--print", "%(title)s", "--no-playlist"],
+                    [YT_DLP_PATH, url, "--print", "%(title)s", "--no-playlist", "--extractor-args", "youtube:player_client=android,ios"],
                     capture_output=True,
                     text=True,
                     timeout=10,

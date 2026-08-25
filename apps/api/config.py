@@ -53,7 +53,9 @@ if _HAS_PYDANTIC_SETTINGS:
         WEIGHT_WHISPER: float = 0.25
         WEIGHT_OCR: float = 0.15
 
-        EXPLAINABILITY_TIMEOUT_S: float = 1.5
+        # Set to > 0.0 to enable Gemini explanations (costs API credits).
+        # 0.0 = always use the instant rule-based fallback (recommended for cost control).
+        EXPLAINABILITY_TIMEOUT_S: float = 0.0
         MERGE_GAP_SECONDS: float = 4.0
 
         model_config = SettingsConfigDict(
@@ -77,7 +79,9 @@ else:
         WEIGHT_WHISPER: float = 0.25
         WEIGHT_OCR: float = 0.15
 
-        EXPLAINABILITY_TIMEOUT_S: float = 1.5
+        # Set to > 0.0 to enable Gemini explanations (costs API credits).
+        # 0.0 = always use the instant rule-based fallback (recommended for cost control).
+        EXPLAINABILITY_TIMEOUT_S: float = 0.0
         MERGE_GAP_SECONDS: float = 4.0
 
 

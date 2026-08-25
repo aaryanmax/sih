@@ -218,8 +218,9 @@ async def search_endpoint(req: SearchRequest):
     # -- 2. Retrieval -------------------------------------------------------
     retriever = _get_retriever()
     try:
-        # Overfetch from Qdrant to account for results that will be filtered out
-        scenes = retriever.search(query_vectors, top_k=req.top_k * 3)
+        # Overfetch slightly from Qdrant so Temporal-NMS deduplication has
+        # enough candidates, then trim before the (paid) Groq filter step.
+        scenes = retriever.search(query_vectors, top_k=req.top_k * 2)
     except Exception as exc:
         logger.error("Retrieval failed: %s", exc, exc_info=True)
         raise HTTPException(status_code=503, detail=f"Retrieval engine unavailable: {exc}")
@@ -228,15 +229,21 @@ async def search_endpoint(req: SearchRequest):
         return SearchResponse(query=req.query, total=0, results=[])
 
     # -- 2.5. Strict Relevance Filtering via Groq --------------------------
+    # Cap the candidate set before Groq to limit API spend: scenes are already
+    # deduplicated by Temporal-NMS so the top-(top_k + 3) are a good pool.
     groq_filter = _get_groq_filter()
-    scenes = await groq_filter.filter_scenes(req.query, scenes)
-    scenes = scenes[: req.top_k]
+    groq_candidates = scenes[: req.top_k + 3]
+    filtered_scenes = await groq_filter.filter_scenes(req.query, groq_candidates)
+    scenes = filtered_scenes[: req.top_k]
 
     if not scenes:
         logger.info("All retrieved scenes were rejected by Groq filter for query: '%s'", req.query)
         return SearchResponse(query=req.query, total=0, results=[])
 
-    # -- 3. Parallel explanation generation --------------------------------
+    # -- 3. Explanation generation -----------------------------------------
+    # When EXPLAINABILITY_TIMEOUT_S == 0.0 the ExplainabilityService always
+    # returns the rule-based fallback instantly — no Gemini API calls are made.
+    # Set EXPLAINABILITY_TIMEOUT_S > 0 in config to enable Gemini explanations.
     explainability = _get_explainability()
 
     async def _explain(scene) -> str:
@@ -250,7 +257,6 @@ async def search_endpoint(req: SearchRequest):
             ocr_text=scene.ocr_text or "",
         )
 
-    # Fire all explanation requests concurrently
     explanations: List[str] = await asyncio.gather(*[_explain(s) for s in scenes])
 
     # -- 4. Assemble response with Hybrid Modality Score breakdown ---------
@@ -277,7 +283,7 @@ async def search_endpoint(req: SearchRequest):
             )
         )
 
-    # Sort by fused score
+    # Sort by fused score descending
     results.sort(key=lambda item: item.score, reverse=True)
 
     logger.info(
@@ -312,13 +318,19 @@ async def multi_intent_search_endpoint(req: MultiIntentSearchRequest):
 
     intent_items: List[IntentResultItem] = []
 
-    # Assemble explainability and modality scores for each intent's results
+    # Assemble explainability and modality scores for each intent's results.
+    # IMPORTANT: capture `intent_group` via default argument to avoid the Python
+    # closure-in-loop scoping bug (all iterations sharing the last loop value).
     for intent_group in multi_result.intents:
         scenes = intent_group.results
 
-        async def _explain_intent_scene(scene) -> str:
+        async def _explain_intent_scene(
+            scene,
+            _topic: str = multi_result.topic,
+            _objective: str = intent_group.objective,
+        ) -> str:
             return await explainability.generate_explanation(
-                query=f"{multi_result.topic}: {intent_group.objective}",
+                query=f"{_topic}: {_objective}",
                 video_id=scene.video_id,
                 start_time=scene.start_time,
                 end_time=scene.end_time,

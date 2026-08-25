@@ -194,7 +194,9 @@ class ExplainabilityService:
     ) -> str:
         fallback = self._rule_based(query, video_id, start_time, end_time, score)
 
-        if self.client is None:
+        # Fast path: timeout_s == 0.0 means "never call Gemini".
+        # This avoids creating asyncio tasks and API round-trips entirely.
+        if self.timeout_s <= 0.0 or self.client is None:
             return fallback
 
         context_parts = []

@@ -1,3 +1,4 @@
+import functools
 import json
 import logging
 import os
@@ -65,9 +66,17 @@ class MultiSearchPlanner:
     def plan(self, user_query: str) -> MultiSearchPlan:
         """
         Plans intent-based search objectives for a user query.
+
+        Results are cached (up to 256 unique queries) so repeated identical
+        queries never trigger a duplicate Gemini API call.
+
         Falls back to rule-based decomposition if Gemini is unavailable.
         """
-        user_query = user_query.strip()
+        return self._plan_cached(user_query.strip())
+
+    @functools.lru_cache(maxsize=256)
+    def _plan_cached(self, user_query: str) -> MultiSearchPlan:
+        """Cache-backed implementation of plan(); keyed on the stripped query string."""
         if not user_query:
             return MultiSearchPlan(topic="general", searches=[])
 
