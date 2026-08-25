@@ -1,6 +1,9 @@
-# Pipeline Package (Phase 1)
+# Pipeline Package — Batch & URL Ingestion
 
-Contains the centralized batch ingestion orchestrator.
+Contains the master ingestion pipelines for both local video batch indexing and live URL downloads.
 
-## Files
-- `batch_indexer.py`: The master ingestion runner. It scans the `data/raw_videos` directory, chunks videos using `VideoChunker`, extracts hidden states via the VLM engine, encodes them into multi-vectors with `PatchEncoder`, synchronizes Whisper and OCR transcripts, and finally packages everything into `models.PointStruct` payloads for batch insertion into Qdrant.
+## Components
+
+- `batch_indexer.py`: Scans video directories, chunks video streams into 2-second windows using `decord`, runs VLM visual patch extraction, synchronizes Whisper and OCR transcripts, and batches payloads into Qdrant (`video_frames`).
+- `url_ingest.py`: High-speed URL ingestion handler for YouTube Shorts, Reels, and direct video links with canonical ID deduplication.
+- `frame_analyzer.py`: Temporal scene analyzer using Google Gemini to produce semantic captions and object tags per extracted keyframe.

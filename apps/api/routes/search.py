@@ -44,6 +44,7 @@ from multi_search import (  # type: ignore
     MultiSearchPlanner,
 )
 from pipeline.url_ingest import download_and_process_url  # type: ignore
+from pipeline_engine.groq_filter import GroqRelevanceFilter
 from retrieval.late_interaction import LateInteractionRetriever  # type: ignore
 from services.explainability import ExplainabilityService  # type: ignore
 
@@ -63,6 +64,7 @@ _retriever: Optional[LateInteractionRetriever] = None
 _explainability: Optional[ExplainabilityService] = None
 _multi_engine: Optional[MultiIntentEngine] = None
 _mock_multi_engine: Optional[MultiIntentEngine] = None
+_groq_filter: Optional[GroqRelevanceFilter] = None
 
 
 def _get_retriever() -> LateInteractionRetriever:
@@ -93,6 +95,13 @@ def _get_multi_engine(use_mock: bool = False) -> MultiIntentEngine:
         backend = ColPaliRetrieverBackend(retriever=_get_retriever())
         _multi_engine = MultiIntentEngine(backend=backend)
     return _multi_engine
+
+
+def _get_groq_filter() -> GroqRelevanceFilter:
+    global _groq_filter
+    if _groq_filter is None:
+        _groq_filter = GroqRelevanceFilter()
+    return _groq_filter
 
 
 # ---------------------------------------------------------------------------
@@ -209,12 +218,22 @@ async def search_endpoint(req: SearchRequest):
     # -- 2. Retrieval -------------------------------------------------------
     retriever = _get_retriever()
     try:
-        scenes = retriever.search(query_vectors, top_k=req.top_k)
+        # Overfetch from Qdrant to account for results that will be filtered out
+        scenes = retriever.search(query_vectors, top_k=req.top_k * 3)
     except Exception as exc:
         logger.error("Retrieval failed: %s", exc, exc_info=True)
         raise HTTPException(status_code=503, detail=f"Retrieval engine unavailable: {exc}")
 
     if not scenes:
+        return SearchResponse(query=req.query, total=0, results=[])
+
+    # -- 2.5. Strict Relevance Filtering via Groq --------------------------
+    groq_filter = _get_groq_filter()
+    scenes = await groq_filter.filter_scenes(req.query, scenes)
+    scenes = scenes[: req.top_k]
+
+    if not scenes:
+        logger.info("All retrieved scenes were rejected by Groq filter for query: '%s'", req.query)
         return SearchResponse(query=req.query, total=0, results=[])
 
     # -- 3. Parallel explanation generation --------------------------------
@@ -261,21 +280,13 @@ async def search_endpoint(req: SearchRequest):
     # Sort by fused score
     results.sort(key=lambda item: item.score, reverse=True)
 
-    # Filter out low-confidence noise (random vector matches without text matches)
-    filtered_results = []
-    for r in results:
-        # If no textual match and visual score is very low, it's likely noise
-        if r.whisper_score < 0.05 and r.ocr_score < 0.05 and r.visual_score < 0.6:
-            continue
-        filtered_results.append(r)
-
     logger.info(
         "Search complete: query='%s' → %d results (best score=%.3f)",
         req.query,
-        len(filtered_results),
-        filtered_results[0].score if filtered_results else 0,
+        len(results),
+        results[0].score if results else 0,
     )
-    return SearchResponse(query=req.query, total=len(filtered_results), results=filtered_results)
+    return SearchResponse(query=req.query, total=len(results), results=results)
 
 
 @router.post("/api/v1/search/multi-intent", response_model=MultiIntentSearchResponse)
@@ -383,32 +394,28 @@ async def ingest_url(req: IngestUrlRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/api/v1/debug/video/{filename}")
-async def debug_video(filename: str):
+@router.get("/api/v1/debug/all_indexed_videos")
+async def debug_all_videos():
     retriever = _get_retriever()
-    from qdrant_client.models import FieldCondition, Filter, MatchValue
-
     try:
-        pts, _ = retriever.client.scroll(
+        points, _ = retriever.client.scroll(
             collection_name=retriever.collection_name,
-            scroll_filter=Filter(must=[FieldCondition(key="video_filename", match=MatchValue(value=filename))]),
-            limit=20,
+            limit=500,
             with_payload=True,
-            with_vectors=True,
         )
+        videos = {}
+        for p in points:
+            ds = p.payload.get("dataset_source", "unknown")
+            fn = p.payload.get("video_filename", "unknown")
+            title = p.payload.get("video_title", fn)
+            videos.setdefault(ds, {})
+            videos[ds][fn] = {
+                "title": title,
+                "chunks_count": videos[ds].get(fn, {}).get("chunks_count", 0) + 1,
+            }
         return {
-            "filename": filename,
-            "points_count": len(pts),
-            "points": [
-                {
-                    "id": p.id,
-                    "payload": p.payload,
-                    "vector_shape": len(p.vector[retriever.vector_name])
-                    if isinstance(p.vector, dict) and retriever.vector_name in p.vector
-                    else None,
-                }
-                for p in pts
-            ],
+            "total_points": len(points),
+            "datasets": {k: {"files_count": len(v), "files": v} for k, v in videos.items()},
         }
     except Exception as e:
         return {"error": str(e)}

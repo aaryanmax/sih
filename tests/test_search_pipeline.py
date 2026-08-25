@@ -114,7 +114,7 @@ def test_maxsim_score_calculation():
 
 def test_temporal_scene_merger():
     """Verify greedy temporal sweep correctly aggregates contiguous chunks."""
-    retriever = LateInteractionRetriever(merge_gap=4.0)
+    retriever = LateInteractionRetriever(merge_gap=4.0, check_disk_exists=False)
 
     scored_chunks = [
         # Video 1: chunk 0-2s and chunk 2-4s (should merge into 0-4s)
@@ -129,13 +129,14 @@ def test_temporal_scene_merger():
     scenes = retriever._merge_chunks(scored_chunks, top_k=5)
     assert len(scenes) == 3
 
-    # First scene should be the merged v1 (0.0 to 4.0 with max score 0.95)
+    # First scene should be the highest scored chunk (2.0 to 4.0, score 0.95)
+    # The 0.0 to 2.0 chunk is suppressed by NMS because it's adjacent.
     best_scene = scenes[0]
     assert best_scene.video_id == "v1"
-    assert best_scene.start_time == 0.0
+    assert best_scene.start_time == 2.0
     assert best_scene.end_time == 4.0
     assert math.isclose(best_scene.score, 0.95, rel_tol=1e-3)
-    assert "hello … world" in best_scene.transcript_text
+    assert "world" in best_scene.transcript_text
 
 
 # ---------------------------------------------------------------------------

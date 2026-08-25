@@ -1,5 +1,5 @@
 """
-Qdrant Multi-Vector Store Integration for Video Frames (M2 Module)
+Qdrant Multi-Vector Store Integration for Video Frames
 """
 
 import os
@@ -10,10 +10,10 @@ from qdrant_client.http import models
 
 
 class VideoVectorStore:
-    def __init__(self, host: Optional[str] = None, port: Optional[int] = None):
+    def __init__(self, host: Optional[str] = None, port: Optional[int] = None, collection_name: Optional[str] = None):
         self.host = host or os.getenv("QDRANT_HOST", "localhost")
         self.port = int(port or os.getenv("QDRANT_PORT", "6333"))
-        self.collection_name = "sih_video_keyframes"
+        self.collection_name = collection_name or os.getenv("QDRANT_COLLECTION", "video_frames")
         try:
             self.client = QdrantClient(host=self.host, port=self.port, timeout=5.0)
         except Exception:

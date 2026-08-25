@@ -1,0 +1,12 @@
+numpy
+faiss-cpu
+torch
+transformers>=4.45.0
+accelerate
+Pillow
+pytesseract
+ultralytics
+google-genai
+opencv-python
+groq
+python-dotenv

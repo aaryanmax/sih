@@ -2,7 +2,8 @@
   "include": [
     "packages",
     "apps",
-    "scripts"
+    "scripts",
+    "tests"
   ],
   "exclude": [
     "**/node_modules",
@@ -15,10 +16,12 @@
     "packages/multi_search",
     "packages/retrieval",
     "packages/embeddings",
-    "packages/audio-ocr",
-    "packages/vlm-engine",
-    "packages/vllm-inference",
+    "packages/audio_ocr",
+    "packages/vlm_engine",
+    "packages/vllm_inference",
+    "packages/late_interaction",
     "packages/pipeline",
+    "packages/pipeline_engine",
     "apps/api"
   ]
 }

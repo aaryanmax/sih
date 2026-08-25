@@ -1,10 +1,21 @@
-# M5: Next.js Web Frontend for SIH Advanced Video Search
+# Next.js Web Frontend for ChronoVision AI
 
-Interactive user interface for exploring video archives with late-interaction multi-vector search, token-to-patch attention heatmaps, frame-level reasoning with Qwen-VL, audio transcript synching, and video playback.
+Interactive user interface built with **Next.js 14**, **React 18**, **Node.js 24**, and **Tailwind CSS** for exploring video archives with late-interaction multi-vector search, token-to-patch attention heatmaps, causal explainability, and synchronized video playback.
 
 ## Features
-- **Semantic Query Bar**: Natural language queries searching both visual features, text overlays, and audio speech.
-- **MaxSim Patch Heatmaps**: Visualizes which image patches fired for each specific query token.
-- **Synchronized Video Player**: Jumps immediately to the exact timestamp of the highest matching frame.
-- **Multimodal Filters**: Toggle visual search, OCR matches, and Whisper speech matches.
-- **Qwen-VL Reasoning Panel**: Frame-by-frame visual question answering and scene explanation.
+
+- **Semantic Query Bar**: Natural language query input searching visual patch features, text overlays, and audio speech.
+- **MaxSim Patch Heatmaps (`LateInteractionHeatmap.tsx`)**: Visualizes which image patches fired for each specific query token with a temporal sparkline scrubber.
+- **Synchronized Video Player (`ReelPlayer.tsx`)**: Jumps immediately to the exact timestamp of the peak matching frame.
+- **TikTok/Reels Feed (`/reels`)**: Vertical video feed optimized for short-form content exploration.
+- **Multimodal Signal Breakdown**: Visualizes the blended score contributions across ColPali visual embeddings, Whisper transcripts, and OCR overlays.
+
+## Running Locally
+
+```bash
+cd apps/web
+npm install
+npm run dev
+```
+
+For full environment deployment instructions, see [`setup/README.md`](../../setup/README.md).

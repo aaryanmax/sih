@@ -42,6 +42,7 @@ extraPaths = [
     "packages/vllm_inference",
     "packages/pipeline",
     "packages/late_interaction",
+    "packages/pipeline_engine",
     "apps/api"
 ]
 

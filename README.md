@@ -1,20 +1,22 @@
 <div align="center">
 
-# ⚡ ChronoVision AI
-### Deep Multimodal Semantic Video Intelligence & Late-Interaction Retrieval Platform
+# ⚡ ChronoVision AI: Multi-Modal Video Retrieval Engine
+### *Sub-Second Temporal Video Search via ColPali Late-Interaction, YOLO Object Detection, OCR, & Gemini Dual-Model Reranking*
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.14+](https://img.shields.io/badge/Python-3.14+-3776AB.svg?logo=python&logoColor=white)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Node.js 24](https://img.shields.io/badge/Node.js-24+-black.svg?logo=node.js&logoColor=white)](https://nodejs.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Next.js 14](https://img.shields.io/badge/Next.js-14.2-black.svg?logo=next.js&logoColor=white)](https://nextjs.org)
 [![Qdrant](https://img.shields.io/badge/Qdrant-v1.14.0-red.svg?logo=qdrant&logoColor=white)](https://qdrant.tech)
 [![Qwen2-VL](https://img.shields.io/badge/VLM-Qwen2--VL--7B-purple.svg)](https://github.com/QwenLM/Qwen2-VL)
 [![ColPali](https://img.shields.io/badge/Retrieval-ColPali_MaxSim-indigo.svg)](https://github.com/illuin-tech/colpali)
 
 <p align="center">
-  <strong>Search raw, unstructured video archives through fine-grained token-to-patch late interaction, speech acoustic transcripts, visual OCR overlay text, and temporal AI causal explainability.</strong>
+  <strong>Search raw, unstructured video archives through fine-grained token-to-patch late interaction, speech acoustic transcripts, visual OCR overlay text, YOLO object keyword boosting, and dual Gemini explainability & reranking.</strong>
 </p>
+
+[**🚀 Quick Setup Guide**](setup/README.md) • [**🪟 Windows 1-Click Setup**](setup/WINDOWS_SETUP.md) • [**🐧 Linux/macOS Guide**](setup/LINUX_MAC_SETUP.md) • [**🐳 Docker Deployment**](setup/DOCKER_SETUP.md) • [**📖 Technical Audit**](docs/CHRONOVISION_REPORT.md)
 
 </div>
 
@@ -26,122 +28,151 @@ Traditional video search compresses entire frames or video clips into single den
 
 **ChronoVision AI** solves this through a unified **Multi-Modal Late-Interaction (ColPali / ColBERT paradigm)** retrieval architecture combined with a high-throughput Vision-Language Model (VLM):
 
-1. **Token-to-Patch Multi-Vector Alignment (ColPali MaxSim)**: Queries are tokenized and scored against 64+ visual patch embeddings per keyframe using native Qdrant `MultiVectorConfig(comparator=MAX_SIM)`.
-2. **Temporal Context Video Slicing**: Chunks raw `.mp4` streams into 2-second overlapping tensor windows via `decord` and PyTorch hardware pipelines.
-3. **Tri-Modal Hybrid Scoring**: Combines Visual Patch MaxSim ($60\%$), Whisper Audio Transcript alignment ($25\%$), and Keyframe OCR overlay text ($15\%$).
-4. **Sub-300ms Causal Explainability**: Leverages **Gemini 3.5 Flash-Lite** with an asynchronous fallback circuit breaker to output natural language rationale explaining *why* each retrieved segment matches the query.
-5. **Interactive Cross-Attention Heatmaps & Temporal Scrubber**: Visualizes token-to-patch attention maps and timeline sparkline heatmaps directly on top of the video player.
+1. **Token-to-Patch Multi-Vector Alignment (ColPali MaxSim)**: Queries are tokenized and scored against 64+ visual patch embeddings per keyframe using native Qdrant `MultiVectorConfig(comparator=MAX_SIM)` or in-memory FAISS.
+2. **Real-Time YOLO Object Detection & Query Filtering**: Frame-level object detection using Ultralytics YOLO with 80 COCO classes. Supports natural-language query keyword extraction with hard `filter` mode and soft `boost` (+0.5 score) mode.
+3. **Parallel Multithreaded OCR Text Intelligence**: OCR text extraction across frames using `ThreadPoolExecutor` and lexical token overlap scoring (`text_match_score`).
+4. **OpenCV & decord Temporal Frame Sampling**: Chunks and seeks raw `.mp4` / `.mov` / `.avi` streams at customizable intervals (e.g. 2.0s) with microsecond timestamp tracking.
+5. **Dual-Model Gemini Reranker & Explainability**: Leverages **Gemini 3.5 Flash-Lite** as the primary engine with **Gemini 3.1 Flash-Lite** as automatic circuit-breaker fallback, providing one-sentence natural language rationale.
+6. **Zero-Docker Offline Search Mode (FAISS)**: Works 100% offline on any laptop using in-memory FAISS with sub-10ms CPU search — ideal for live stage demos without running Docker or databases.
+7. **Interactive Cross-Attention Heatmaps & Temporal Scrubber**: Visualizes token-to-patch attention maps and timeline sparkline heatmaps directly on top of the video player.
 
 ---
 
-## 🏛️ Architecture & Module Map
+## 🏛️ Architecture & System Map
 
 ```
-                     ┌───────────────────────────┐
-                     │    Raw Video (.mp4)       │
-                     └─────────────┬─────────────┘
-                                   │
-         ┌─────────────────────────┼─────────────────────────┐
-         ▼                         ▼                         ▼
-  ┌───────────────┐        ┌───────────────┐        ┌───────────────┐
-  │  vLM Engine   │        │   Whisper     │        │   PaddleOCR   │
-  │ Video Chunker │        │ Transcription │        │ Text Detector │
-  └───────┬───────┘        └───────┬───────┘        └───────┬───────┘
-          │ (Tensor Chunks)        │ (Transcripts)          │ (Text Bounding)
-          ▼                        │                        │
-  ┌───────────────┐                │                        │
-  │    ColPali    │                │                        │
-  │ Patch Encoder │                │                        │
-  └───────┬───────┘                │                        │
-          │ (Multi-Vectors: 64x128)│                        │
-          └────────────────┬───────┴────────────────────────┘
-                           │
-                           ▼
-          ┌───────────────────────────────────┐
-          │   Qdrant Multi-Vector Storage     │
-          │  (video_frames collection)        │
-          └─────────────────┬─────────────────┘
-                            │
-                            ▼
-          ┌───────────────────────────────────┐
-          │     FastAPI Central Backend       │
-          │ - Query Multi-Vector Encoder      │
-          │ - Hybrid Retrieval (MaxSim + BM25)│
-          │ - Gemini 3.5 Flash Explainability │
-          └─────────────────┬─────────────────┘
-                            │
-                            ▼
-          ┌───────────────────────────────────┐
-          │    Next.js Interactive Dashboard  │
-          │ - Timeline Heatmap Scrubber       │
-          │ - Token-to-Patch Attention Grid   │
-          │ - Instant Video Seek Playback     │
-          └───────────────────────────────────┘
+                             ┌───────────────────────────┐
+                             │    Raw Video (.mp4)       │
+                             └─────────────┬─────────────┘
+                                           │
+         ┌───────────────────┬─────────────┴─────────────┬───────────────────┐
+         ▼                   ▼                           ▼                   ▼
+  ┌───────────────┐   ┌───────────────┐           ┌───────────────┐   ┌───────────────┐
+  │ OpenCV Loader │   │ Whisper Audio │           │ Tesseract OCR │   │ YOLO Detector │
+  │ Frame Sampler │   │ Transcription │           │ Multithreaded │   │ COCO 80-Class │
+  └───────┬───────┘   └───────┬───────┘           └───────┬───────┘   └───────┬───────┘
+          │ (RGB Frames)      │ (Transcripts)             │ (Text)            │ (Object Labels)
+          ▼                   │                           │                   │
+  ┌───────────────┐           │                           │                   │
+  │    ColPali    │           │                           │                   │
+  │ Qwen2-VL 128d │           │                           │                   │
+  └───────┬───────┘           │                           │                   │
+          │ (Multi-Vectors)   │                           │                   │
+          └─────────┬─────────┴─────────────┬─────────────┴───────────────────┘
+                    │                       │
+                    ▼                       ▼
+      ┌──────────────────────────┐    ┌──────────────────────────┐
+      │  Docker / Online Mode    │    │  Zero-Docker Offline     │
+      │  Qdrant Multi-Vector     │    │  FAISS HNSW Indexer      │
+      │  Collection: video_frames│    │  Two-Stage Candidate ANN │
+      └─────────────┬────────────┘    └─────────────┬────────────┘
+                    │                               │
+                    └───────────────┬───────────────┘
+                                    │
+                                    ▼
+      ┌──────────────────────────────────────────────────────────┐
+      │               FastAPI Central Backend                    │
+      │  - ColPali / ColQwen2 Multi-Vector Query Encoder         │
+      │  - Tri-Modal Hybrid Fusion (Visual + Audio + OCR + YOLO) │
+      │  - Gemini 3.5 Flash-Lite (with 3.1 Flash-Lite Fallback)  │
+      └─────────────────────────────┬────────────────────────────┘
+                                    │
+                                    ▼
+      ┌──────────────────────────────────────────────────────────┐
+      │              Next.js Interactive Dashboard               │
+      │  - Smart Journey Player & Timeline Heatmap Scrubber      │
+      │  - Token-to-Patch Attention Grid & Instant Video Seek    │
+      └──────────────────────────────────────────────────────────┘
 ```
 
-### Module Breakdown
+---
 
-| Module | Directory | Primary Responsibilities |
-| :--- | :--- | :--- |
-| **vLM Engine** | [`packages/vlm_engine/`](packages/vlm_engine) | Temporal video slicing (`video_chunker.py`) & Qwen2-VL GPU inference server (`inference_server.py`). |
-| **Embeddings & ColPali** | [`packages/embeddings/`](packages/embeddings) & [`packages/late_interaction/`](packages/late_interaction) | Patch multi-vector extraction (`patch_encoder.py`), query embedding (`query_encoder.py`), and Qdrant MaxSim scoring (`maxsim_scorer.py`). |
-| **Acoustic & OCR Intelligence** | [`packages/audio_ocr/`](packages/audio_ocr) | Faster-Whisper timestamp transcription (`whisper_processor.py`) & keyframe OCR extraction (`ocr_processor.py`). |
-| **Central Backend API** | [`apps/api/`](apps/api) | FastAPI search router (`routes/search.py`) & Gemini causal explainability (`services/explainability.py`). |
-| **Interactive Frontend** | [`apps/web/`](apps/web) & [`src/`](src) | Next.js search interface & interactive Late-Interaction Heatmap playground. |
-| **Orchestration & DevOps** | [`docker-compose.yml`](docker-compose.yml) & [`Makefile`](Makefile) | One-click containerized cluster with GPU resource reservations and healthchecks. |
+## 📦 Directory Structure
+
+```
+chronovision-ai/
+├── apps/
+│   ├── api/                     # FastAPI backend (endpoints, explainability, search)
+│   └── web/                     # Next.js frontend (Smart Journey Player, search UI, /reels)
+├── packages/
+│   ├── audio_ocr/               # Whisper speech & OCR processors
+│   ├── embeddings/              # Qwen2-VL PatchEncoder & QueryEncoder
+│   ├── late_interaction/        # Qdrant late-interaction pipeline & scoring
+│   ├── multi_search/            # Hierarchical multi-intent planner & ranking
+│   ├── pipeline/                # Batch indexer & video analyzer
+│   ├── pipeline_engine/         # Standalone local pipeline engine (FAISS, YOLO, OCR)
+│   ├── retrieval/               # Hybrid search & Qdrant seeding
+│   ├── vllm_inference/          # vLLM inference microservice
+│   └── vlm_engine/              # Video chunker & inference server
+├── setup/                       # Complete cross-platform setup guides & scripts
+│   ├── README.md                # Master setup hub
+│   ├── WINDOWS_SETUP.md         # Windows beginner setup guide
+│   ├── LINUX_MAC_SETUP.md       # Linux and macOS installation guide
+│   ├── DOCKER_SETUP.md          # Multi-container Docker deployment guide
+│   ├── ENVIRONMENT.md           # Environment variable (.env) dictionary
+│   └── setup_windows.bat        # Automated 1-click Windows installer script
+├── docs/                        # Architecture reports & technical audits
+│   ├── PROJECT_REPORT.md        # Project status report
+│   └── CHRONOVISION_REPORT.md   # Deep technical audit & retrieval proof
+├── data/                        # Local datasets, Qdrant storage, and models
+├── scripts/                     # Ingestion, seeding, and smoke testing utilities
+├── tests/                       # Automated pytest test suites
+├── setup_windows.bat            # Root delegator for 1-click Windows setup
+├── docker-compose.yml           # Multi-container orchestration
+├── pyproject.toml               # Python 3.14 configuration (Ruff, Black, Pyright)
+└── README.md                    # System documentation
+```
 
 ---
 
 ## 🚀 Quick Start
 
-### Prerequisites
-- Python 3.14+
-- Node.js 24+
-- Docker & Docker Compose (v2.20+)
-- NVIDIA GPU with CUDA 12.1+ (optional, fallback CPU mode supported)
+### 1. One-Click Setup (Windows)
 
-### 1. Clone & Setup Environment
+Simply double-click [`setup_windows.bat`](setup_windows.bat) or see the [Windows Setup Guide](setup/WINDOWS_SETUP.md).
+
+### 2. Docker Compose (Cross-Platform)
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/chronovision-ai.git
-cd chronovision-ai
+git clone https://github.com/aaryanmax/sih.git
+cd sih
 
-# Copy environment variables
+# Configure environment variables
 cp .env.example .env
+
+# Launch Qdrant, FastAPI backend, and Next.js frontend
+docker compose up -d
 ```
 
-### 2. Launch Full Stack with Docker
+### 3. Local Bare-Metal Setup (Python 3.14 & Node.js 24)
 
 ```bash
-# Launch Qdrant, FastAPI, vLLM Engine, and Next.js
-docker compose up -d
+# Python backend
+python -m venv .venv
+# On Windows: .venv\Scripts\activate | On Linux/macOS: source .venv/bin/activate
+pip install -r requirements.txt
+pip install -r apps/api/requirements.txt
+python -m uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 --reload
 
-# Check service logs
-docker compose logs -f
+# Next.js frontend (in separate terminal)
+cd apps/web && npm install && npm run dev
 ```
 
-- **Frontend Dashboard**: [http://localhost:3001](http://localhost:3001) (or `http://localhost:3000` via Vite)
+- **Frontend Dashboard**: [http://localhost:3001](http://localhost:3001) (or `http://localhost:3000` via bare metal)
 - **FastAPI Documentation**: [http://localhost:8000/docs](http://localhost:8000/docs)
 - **Qdrant Dashboard**: [http://localhost:6333/dashboard](http://localhost:6333/dashboard)
-
-### 3. Run Ingestion Pipeline
-
-```bash
-# Ingest and index raw video files in batch mode
-make index-batch
-```
 
 ---
 
 ## 📡 API Reference
 
 ### Multimodal Hybrid Search
-`POST /api/v1/search`
+`POST /api/v1/search/multi-intent`
 
 ```json
 {
-  "query": "ColPali late interaction MaxSim formula",
+  "query": "person doing yoga on the beach",
   "top_k": 5
 }
 ```
@@ -149,16 +180,20 @@ make index-batch
 **Response:**
 ```json
 {
-  "query": "ColPali late interaction MaxSim formula",
+  "query": "person doing yoga on the beach",
+  "total": 1,
   "results": [
     {
-      "video_id": "vid_colpali_overview",
-      "timestamp_s": 165.0,
-      "score": 0.942,
-      "explanation": "Visual frame shows mathematical slide highlighting token-to-patch scoring matrix alongside audio transcript discussing multi-vector retention.",
-      "transcript_text": "Notice how late interaction retains fine-grained patch tokens without single vector loss.",
-      "ocr_text": "Score = sum(max(q_i * d_j)) over all query tokens",
-      "keyframe_url": "/storage/frames/colpali_165.jpg"
+      "video_id": "vid_beach_yoga_01",
+      "video_url": "/videos/shorts/yt_bALeYF_5qME.mp4",
+      "start_time": 12.0,
+      "end_time": 16.0,
+      "score": 0.935,
+      "visual_score": 0.880,
+      "whisper_score": 0.750,
+      "ocr_score": 0.0,
+      "explanation": "Visual frame shows a person executing yoga postures on a sandy coastline at sunrise.",
+      "dataset_source": "Live Ingest"
     }
   ]
 }
@@ -168,13 +203,16 @@ make index-batch
 
 ## 🧪 Testing & Verification
 
+Run the automated test suites:
 ```bash
-# Run linting across Python packages and backend
-ruff check apps/api packages/
-black --check apps/api packages/
+# Run backend pytest suite
+python tests/run_tests.py
 
-# Run frontend linting & type checks
-npm run lint
+# Run offline smoke test suite
+python scripts/smoke_test.py --offline
+
+# Run code linter
+ruff check apps/ packages/ scripts/ tests/
 ```
 
 ---

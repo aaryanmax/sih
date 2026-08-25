@@ -160,29 +160,33 @@ export const ReelPlayer: React.FC = () => {
 
   const currentResult = results[currentIndex];
 
-  // Precise seeking on loadedmetadata event
-  const handleLoadedMetadata = () => {
-    if (videoRef.current && currentResult) {
-      const targetTime = currentResult.timestampSeconds || 0;
-      videoRef.current.currentTime = targetTime;
-      videoRef.current.play().then(() => {
-        setIsPlaying(true);
-      }).catch(() => {
-        setIsPlaying(false);
-      });
-    }
-  };
-
   // When result index changes, reset error state
   useEffect(() => {
     setVideoError(false);
     if (videoRef.current && currentResult) {
       const targetTime = currentResult.timestampSeconds || 0;
+      
+      const seekAndPlay = () => {
+        if (videoRef.current) {
+          videoRef.current.currentTime = targetTime;
+          videoRef.current.play().then(() => {
+            setIsPlaying(true);
+          }).catch(() => {
+            setIsPlaying(false);
+          });
+        }
+      };
+
       // If metadata is already loaded for this video element
       if (videoRef.current.readyState >= 1) {
-        videoRef.current.currentTime = targetTime;
-        videoRef.current.play().catch(() => {});
-        setIsPlaying(true);
+        seekAndPlay();
+      } else {
+        // Add event listener for when metadata loads
+        const videoEl = videoRef.current;
+        videoEl.addEventListener('loadedmetadata', seekAndPlay, { once: true });
+        return () => {
+          videoEl.removeEventListener('loadedmetadata', seekAndPlay);
+        };
       }
     }
   }, [currentIndex, currentResult]);
@@ -248,7 +252,6 @@ export const ReelPlayer: React.FC = () => {
                 playsInline
                 loop
                 muted={false}
-                onLoadedMetadata={handleLoadedMetadata}
                 onError={() => setVideoError(true)}
               />
               {videoError && (

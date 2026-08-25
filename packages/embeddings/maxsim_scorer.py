@@ -1,5 +1,5 @@
 """
-Late-Interaction MaxSim Retrieval (M2)
+Late-Interaction MaxSim Retrieval
 Handles schema initialization for multivector payloads in Qdrant and executes MaxSim scoring.
 """
 
@@ -12,8 +12,8 @@ from qdrant_client.http import models
 
 
 class MaxSimRetriever:
-    def __init__(self, collection_name: str = "sih_video_keyframes"):
-        self.collection_name = collection_name
+    def __init__(self, collection_name: str | None = None):
+        self.collection_name = collection_name or os.getenv("QDRANT_COLLECTION", "video_frames")
 
         qdrant_host = os.getenv("QDRANT_HOST", "localhost")
         qdrant_port = int(os.getenv("QDRANT_PORT", "6333"))

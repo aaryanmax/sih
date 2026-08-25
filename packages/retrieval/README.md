@@ -1,6 +1,9 @@
-# Retrieval Package (Phase 2)
+# Retrieval Package — Hybrid Search & Late Interaction
 
-Contains the core logic for querying the Qdrant database using Hybrid Search.
+Contains the core retrieval algorithms querying Qdrant using ColPali Late-Interaction MaxSim and Tri-Modal Hybrid Fusion.
 
-## Files
-- `hybrid_search.py`: The hybrid retrieval engine. It queries Qdrant with the query's multi-vector using `MAX_SIM` and applies a blended scoring function that accounts for the visual patches (via MaxSim), Whisper audio transcripts, and OCR text extracted from the video chunk.
+## Components
+
+- `late_interaction.py`: `LateInteractionRetriever` connecting to Qdrant, executing `query_points` with native `MAX_SIM` comparator, and performing temporal interval merging (`_merge_chunks`) across adjacent 2-second windows.
+- `hybrid_search.py`: Tri-modal fusion scorer blending visual patch scores ($60\%$), Whisper transcripts ($25\%$), and OCR text overlays ($15\%$).
+- `seed_qdrant.py`: Database seeding utility for pre-indexed video moment embeddings.

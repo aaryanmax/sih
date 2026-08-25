@@ -85,10 +85,12 @@ class LateInteractionRetriever:
         collection_name: str = COLLECTION_NAME,
         vector_name: str = VECTOR_NAME,
         merge_gap: float = MERGE_GAP_SECONDS,
+        check_disk_exists: bool = True,
     ) -> None:
         self.collection_name = collection_name
         self.vector_name = vector_name
         self.merge_gap = merge_gap
+        self.check_disk_exists = check_disk_exists
 
         # Check for local data directory
         project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -201,104 +203,84 @@ class LateInteractionRetriever:
         top_k: int,
     ) -> List[SceneResult]:
         """
-        Group temporally adjacent chunks from the same video into scenes.
-
-        Algorithm:
-          - Sort all hits by (video_id, start_time).
-          - Use a greedy sweep: open a new scene window when a hit is from
-            a different video or its start_time is > current scene end + gap.
-          - Accumulate max score over merged chunks.
-          - Return top_k scenes sorted by descending max score.
+        Extract fine-grained moment scenes using Temporal Non-Maximum Suppression (NMS).
+        Preserves the exact start timestamp and discrete visual action of each matching moment.
         """
-        # Build per-video timelines
-        from collections import defaultdict
+        # Sort all candidate chunks by normalized score descending
+        sorted_chunks = sorted(scored_chunks, key=lambda x: x[1], reverse=True)
 
-        timeline: Dict[str, List[tuple]] = defaultdict(list)
+        selected_scenes: List[SceneResult] = []
+        video_intervals: Dict[str, List[tuple[float, float]]] = {}
 
-        for payload, norm_score, point_id in scored_chunks:
+        for payload, norm_score, point_id in sorted_chunks:
             video_id = payload.get("video_id", "unknown")
-            timeline[video_id].append((payload, norm_score, point_id))
+            start = float(payload.get("start_time", 0.0))
+            end = float(payload.get("end_time", start + 3.0))
 
-        scenes: List[SceneResult] = []
+            # Temporal NMS: check if this moment significantly overlaps with an already selected moment from the same video
+            existing = video_intervals.get(video_id, [])
+            overlap = False
+            for ex_start, ex_end in existing:
+                # If moments are within 2.5 seconds of each other, consider them the same moment
+                if abs(start - ex_start) < 2.5 or (max(start, ex_start) < min(end, ex_end)):
+                    overlap = True
+                    break
 
-        for video_id, chunks in timeline.items():
-            # Sort by start_time
-            chunks.sort(key=lambda x: x[0].get("start_time", 0.0))
+            if overlap:
+                continue
 
-            # Greedy merge sweep
-            current: Optional[Dict[str, Any]] = None
-            cur_end: float = -1.0
-            cur_score: float = 0.0
-            cur_ids: List[int] = []
-            cur_transcript: List[str] = []
-            cur_ocr: List[str] = []
+            if video_id not in video_intervals:
+                video_intervals[video_id] = []
+            video_intervals[video_id].append((start, end))
 
-            def _flush() -> None:
-                """Emit the accumulated scene."""
-                nonlocal current
-                if current is None:
-                    return
-                payload0 = current
-                filename = payload0.get("video_filename", f"{video_id}.avi")
-                dataset = payload0.get("dataset_source", "UCF101")
+            filename = payload.get("video_filename", f"{video_id}.mp4")
+            dataset = payload.get("dataset_source", "shorts")
+            if dataset == "Live Ingest":
+                dataset = "shorts"
 
-                # Live ingested videos are saved to the 'shorts' directory
-                if dataset == "Live Ingest":
-                    dataset = "shorts"
+            # -----------------------------------------------------------------
+            # ENFORCE LOCAL EXISTENCE (if enabled):
+            # Skip this result if the actual video file is not on disk.
+            # This filters out legacy benchmark data or phantom results.
+            # -----------------------------------------------------------------
+            if self.check_disk_exists and not payload.get("video_url"):
+                local_video_path = _ROOT / "apps" / "web" / "public" / "videos" / dataset / filename
+                if not local_video_path.exists():
+                    continue
 
-                url = payload0.get("video_url") or VIDEO_URL_TEMPLATE.format(
-                    dataset=dataset,
-                    filename=filename,
+            url = payload.get("video_url") or VIDEO_URL_TEMPLATE.format(
+                dataset=dataset,
+                filename=filename,
+            )
+
+            # Strip the repetitive title prefix if present in transcript_text for cleaner display
+            raw_transcript = payload.get("transcript_text", "")
+            if " — " in raw_transcript:
+                clean_transcript = raw_transcript.split(" — ", 1)[1]
+            elif "  " in raw_transcript:
+                clean_transcript = raw_transcript.split("  ", 1)[1]
+            else:
+                clean_transcript = raw_transcript
+
+            selected_scenes.append(
+                SceneResult(
+                    video_id=video_id,
+                    video_filename=filename,
+                    video_url=url,
+                    dataset_source=dataset,
+                    start_time=start,
+                    end_time=end,
+                    score=round(norm_score, 4),
+                    transcript_text=clean_transcript,
+                    ocr_text=payload.get("ocr_text", ""),
+                    chunk_ids=[point_id],
                 )
-                scenes.append(
-                    SceneResult(
-                        video_id=video_id,
-                        video_filename=filename,
-                        video_url=url,
-                        dataset_source=dataset,
-                        start_time=payload0.get("start_time", 0.0),
-                        end_time=cur_end,
-                        score=round(cur_score, 4),
-                        transcript_text=" … ".join(filter(None, cur_transcript)),
-                        ocr_text=" | ".join(filter(None, cur_ocr)),
-                        chunk_ids=list(cur_ids),
-                    )
-                )
+            )
 
-            for payload, norm_score, point_id in chunks:
-                start: float = payload.get("start_time", 0.0)
-                end: float = payload.get("end_time", start + 2.0)
+            if len(selected_scenes) >= top_k:
+                break
 
-                if current is None:
-                    # Open first window
-                    current = payload
-                    cur_end = end
-                    cur_score = norm_score
-                    cur_ids = [point_id]
-                    cur_transcript = [payload.get("transcript_text", "")]
-                    cur_ocr = [payload.get("ocr_text", "")]
-                elif start <= cur_end + self.merge_gap:
-                    # Extend current window
-                    cur_end = max(cur_end, end)
-                    cur_score = max(cur_score, norm_score)
-                    cur_ids.append(point_id)
-                    cur_transcript.append(payload.get("transcript_text", ""))
-                    cur_ocr.append(payload.get("ocr_text", ""))
-                else:
-                    # Gap too large — flush and open new window
-                    _flush()
-                    current = payload
-                    cur_end = end
-                    cur_score = norm_score
-                    cur_ids = [point_id]
-                    cur_transcript = [payload.get("transcript_text", "")]
-                    cur_ocr = [payload.get("ocr_text", "")]
-
-            _flush()
-
-        # Global sort by score descending, return top_k
-        scenes.sort(key=lambda s: s.score, reverse=True)
-        return scenes[:top_k]
+        return selected_scenes
 
 
 # ---------------------------------------------------------------------------

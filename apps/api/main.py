@@ -11,6 +11,14 @@ _project_root = os.path.abspath(os.path.join(_current_dir, "..", ".."))
 sys.path.insert(0, os.path.join(_project_root, "packages"))
 sys.path.insert(0, os.path.join(_project_root, "apps", "api"))
 
+import logging
+
+# Suppress verbose HTTP request logs from httpx and huggingface
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("transformers").setLevel(logging.WARNING)
+logging.getLogger("huggingface_hub").setLevel(logging.WARNING)
+
 from fastapi import FastAPI, File, Form, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from routes.search import router as search_router
